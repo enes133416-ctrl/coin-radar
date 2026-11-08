@@ -2,6 +2,11 @@ name: update-data
 on:
   schedule: [{cron: "0 */6 * * *"}]   # 6 saatte bir
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Veriyi üret ama repoya yazma"
+        type: boolean
+        default: false
 permissions:
   contents: write
 jobs:
@@ -12,9 +17,11 @@ jobs:
       - uses: actions/setup-python@v5
         with: {python-version: "3.11", cache: pip}
       - run: pip install -r requirements.txt
+      - run: python -m unittest discover -s tests -v
       - run: python scanner.py
-      - run: |
+      - if: ${{ github.event_name != 'workflow_dispatch' || !inputs.dry_run }}
+        run: |
           git config user.name "coin-radar-bot"
           git config user.email "bot@users.noreply.github.com"
-          git add docs/data.json
+          git add docs/data.json docs/report.json
           git diff --staged --quiet || (git commit -m "veri güncellendi" && git push)

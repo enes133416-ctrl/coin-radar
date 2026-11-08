@@ -67,13 +67,15 @@ h3{margin:18px 0 6px;font-size:16px}.note{font-size:13px;color:var(--mute)}
 <main>
 <h1>Coin Radar</h1>
 <p class="lead" id="lead">Yükleniyor...</p>
+<p class="box"><strong>Model oynaklığı tahmin etmede yönden daha iyidir. Yatırım tavsiyesi değildir.</strong></p>
+<p id="legacy" class="box" hidden>Bu veri eski model sürümüne aittir. Yeni rapor ve ilk temas tahminleri için tarayıcıyı yeniden çalıştırın.</p>
 <div id="msg" hidden>Veri bulunamadı. Actions sekmesinden <b>update-data</b> iş akışını çalıştır.</div>
 <div id="app" hidden>
 <div class="stats" id="stats"></div>
 <nav role="tablist"><button role="tab" data-t="pred" aria-selected="true">Tahminler</button><button role="tab" data-t="track" aria-selected="false">Takip</button><button role="tab" data-t="model" aria-selected="false">Model</button></nav>
 <section id="v-pred">
 <div class="tools"><input id="q" type="search" placeholder="Coin ara, örn. SOL" aria-label="Coin ara">
-<select id="sort" aria-label="Sırala"><option value="p">Olasılığa göre</option><option value="volume">Hacme göre</option><option value="chg24">24s değişime göre</option></select>
+<select id="sort" aria-label="Sırala"><option value="p">Olasılığa göre</option><option value="vol_zscore">Normalden sapmaya göre</option><option value="volume">Hacme göre</option><option value="chg24">24s değişime göre</option></select>
 <label class="chk"><input type="checkbox" id="fav"> Sadece favoriler</label></div>
 <div class="cols"><section class="col up"><h2>Yükseliş adayları</h2><p class="sub" id="s-up"></p><div id="l-up"></div></section>
 <section class="col dn"><h2>Düşüş adayları</h2><p class="sub" id="s-dn"></p><div id="l-dn"></div></section></div>
@@ -87,8 +89,9 @@ h3{margin:18px 0 6px;font-size:16px}.note{font-size:13px;color:var(--mute)}
 <script>
 const $=s=>document.querySelector(s);
 const TR={ret1:"1s getiri",ret3:"3s getiri",ret6:"6s getiri",ret12:"12s getiri",ret24:"24s getiri",ret48:"48s getiri",ret120:"5 gün getiri",vol24:"24s oynaklık",vol72:"72s oynaklık",vol_ratio:"Oynaklık oranı (24s/72s)",range24:"24s fiyat aralığı",atr14:"Ort. mum boyu (14s)",to_hi24:"24s zirvesine uzaklık",to_lo24:"24s dibine uzaklık",to_hi120:"5g zirvesine uzaklık",to_lo120:"5g dibine uzaklık",volx:"Hacim / 24s ortalama",volx3:"3s hacim / 72s ort.",rsi:"RSI (14)",ema_gap:"EMA12 / EMA48 farkı"};
-const NP=["rsi","vol_ratio","volx","volx3"];
-const fv=(f,v)=>v==null?"-":f==="rsi"?v.toFixed(0):NP.includes(f)?v.toFixed(2)+"×":(v*100).toFixed(1)+"%";
+const NP=["rsi","vol_ratio","volx","volx3","vol_zscore","squeeze","btc_corr168","btc_beta168","global_ls","top_ls","utc_hour","utc_weekday","hours_to_funding","open_interest"];
+Object.assign(TR,{atr14:"ATR % (14s)",vol_zscore:"Oynaklık z-skoru",bb_width:"Bollinger genişliği",squeeze:"Sıkışma oranı",to_hi168:"7g zirve uzaklığı",to_lo168:"7g dip uzaklığı",to_hi720:"30g zirve uzaklığı",to_lo720:"30g dip uzaklığı",btc_ret1:"BTC 1s getiri",btc_ret4:"BTC 4s getiri",btc_ret24:"BTC 24s getiri",btc_vol24:"BTC oynaklığı",btc_corr168:"BTC 7g korelasyon",btc_beta168:"BTC 7g beta",funding_rate:"Funding",funding_mean24:"Funding 24s ort.",funding_change24:"Funding 24s değişimi",open_interest:"Açık pozisyon",oi_change1:"OI 1s değişim",oi_change4:"OI 4s değişim",oi_change24:"OI 24s değişim",global_ls:"Global long/short",top_ls:"Top trader long/short",utc_hour:"UTC saat",utc_weekday:"UTC gün",hours_to_funding:"Funding kalan saat"});
+const fv=(f,v)=>v==null?"-":f==="rsi"?v.toFixed(0):NP.includes(f)?v.toLocaleString("tr-TR",{maximumFractionDigits:2}):(v*100).toFixed(1)+"%";
 const fmtP=p=>p>=1?p.toLocaleString("en-US",{maximumFractionDigits:2}):p.toPrecision(3);
 const fmtV=v=>v>=1e9?(v/1e9).toFixed(1)+" Mr $":(v/1e6).toFixed(0)+" Mn $";
 const pc=x=>"%"+(x*100).toFixed(1);
@@ -99,13 +102,14 @@ const saveFav=()=>{try{localStorage.setItem("fav",JSON.stringify(favs))}catch(e)
 function spark(a,w=84,h=26,sw=1.6){const mn=Math.min(...a),r=Math.max(...a)-mn||1,p=a.map((v,i)=>`${(i/(a.length-1)*w).toFixed(1)},${(h-(v-mn)/r*(h-3)-1.5).toFixed(1)}`).join(" ");
 return `<svg viewBox="0 0 ${w} ${h}" width="${w<200?w:"100%"}" height="${h<200&&w<200?h:"auto"}" aria-hidden="true"><polyline points="${p}" fill="none" stroke="${a[a.length-1]>=a[0]?"var(--up)":"var(--dn)"}" stroke-width="${sw}" stroke-linejoin="round"/></svg>`}
 fetch("data.json?"+Date.now()).then(r=>{if(!r.ok)throw 0;return r.json()}).then(d=>{D=d;init()}).catch(()=>{$("#msg").hidden=false;$("#lead").textContent=""});
-const hitRate=k=>{const r=D.track.filter(e=>e.side===k);return{n:r.length,h:r.filter(e=>e.hit).length}};
+const hitRate=k=>{const r=D.track.filter(e=>e.side===k && e.hit!=null);return{n:r.length,h:r.filter(e=>e.hit).length}};
 function init(){
  const th=Math.round(D.threshold*100),m=D.meta;
+ $("#legacy").hidden=D.label_version==="first_touch_v1";
  $("#lead").textContent=`Önümüzdeki ${D.horizon} saatte fiyatın %${th} yükselip aşağı inmeden (veya tersi) hareket etme olasılığı. Model, Binance'teki ${m.coins} hacimli coinin saatlik geçmişinden öğrenir; her çalışmada tahminler kaydedilir ve ${D.horizon} saat sonra gerçekle karşılaştırılır.`;
  const u=hitRate("up"),d=hitRate("dn"),all=u.n+d.n,hh=u.h+d.h;
  $("#stats").innerHTML=[[new Date(D.generated).toLocaleString("tr-TR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}),"Son güncelleme"],[m.candles.toLocaleString("tr-TR"),`mum (${m.data_from.slice(5,10)} - ${m.data_to.slice(5,10)})`],[m.train_rows.toLocaleString("tr-TR"),`eğitim örneği, ${m.features} özellik`],[all?pc(hh/all):"Bekliyor",all?`canlı isabet (${all} tahmin)`:"canlı takip sonucu"]].map(x=>`<div><b>${x[0]}</b><span>${x[1]}</span></div>`).join("");
- for(const k of["up","dn"])$("#s-"+k).textContent=`${D.horizon} saatte ${k==="up"?"+":"-"}%${th} görüp tersine ${k==="up"?"-":"+"}%${th} görmeme olasılığı`;
+ for(const k of["up","dn"])$("#s-"+k).textContent=`${D.horizon} saatte ${k==="up"?"+":"-"}%${th} tersine ${k==="up"?"-":"+"}%${th} eşiğinden önce görme olasılığı`;
  $("#app").hidden=false;
  document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{document.querySelectorAll("nav button").forEach(x=>x.setAttribute("aria-selected",x===b));for(const t of["pred","track","model"])$("#v-"+t).hidden=t!==b.dataset.t});
  ["q","sort","fav"].forEach(i=>$("#"+i).addEventListener("input",()=>{lim={up:15,dn:15};render()}));
@@ -116,11 +120,11 @@ function render(){
  for(const k of["up","dn"]){
   const base=D.metrics[k].base_rate,all=[...D.coins].sort((a,b)=>b["p_"+k]-a["p_"+k]),max=Math.max(all[0]["p_"+k],base)*1.15||1;
   let rows=all.filter(c=>c.symbol.includes(q)&&(!fo||favs.includes(c.symbol)));
-  if(key!=="p")rows.sort((a,b)=>Math.abs(b[key])-Math.abs(a[key]));
+  if(key!=="p")rows.sort((a,b)=>(b[key]==null?-Infinity:Math.abs(b[key]))-(a[key]==null?-Infinity:Math.abs(a[key])));
   const more=rows.length>lim[k]&&!q;
   $("#l-"+k).innerHTML=rows.slice(0,q?60:lim[k]).map(c=>{const p=c["p_"+k],f=favs.includes(c.symbol);return`<div class="row" data-s="${c.symbol}"><button class="star${f?" on":""}" data-f="${c.symbol}" aria-label="Favori">${f?"★":"☆"}</button><div class="sym">${c.symbol}</div>
   <div class="meter" role="img" aria-label="olasılık ${pc(p)}"><div class="fill" style="width:${p/max*100}%"></div><div class="tick" style="left:${base/max*100}%"></div><span class="val">${pc(p)}</span></div>
-  <div class="meta">${spark(c.spark,72,22,1.4)}<span>$${fmtP(c.price)}</span><span class="${c.chg24>=0?"pos":"neg"}">24s ${c.chg24>=0?"+":""}${c.chg24.toFixed(1)}%</span><span>${fmtV(c.volume)}</span></div></div>`}).join("")||'<p class="sub">Eşleşen coin yok.</p>';
+  <div class="meta">${spark(c.spark,72,22,1.4)}<span>$${fmtP(c.price)}</span><span class="${c.chg24>=0?"pos":"neg"}">24s ${c.chg24>=0?"+":""}${c.chg24.toFixed(1)}%</span><span>${fmtV(c.volume)}</span><span>Genel baz oran ${pc(base)}</span><span>Güven: ${c["confidence_"+k]||"bilinmiyor"}</span><span>Normalden sapma: ${c.vol_zscore==null?"-":c.vol_zscore.toFixed(2)+" z"}</span><span>${c.monitoring?.status==="warning"?"⚠ İzleme/delist uyarısı":c.monitoring?.status==="no_warning_reported"?"Etiket uyarısı bildirilmedi":"İzleme/delist: bilinmiyor"}</span></div></div>`}).join("")||'<p class="sub">Eşleşen coin yok.</p>';
   if(more)$("#l-"+k).insertAdjacentHTML("beforeend",`<button class="more" data-m="${k}">Daha fazla göster</button>`);
  }
 }
@@ -132,27 +136,28 @@ document.addEventListener("click",e=>{
 });
 function why(k,c){const a=c["why_"+k],m=Math.max(...a.map(x=>Math.abs(x.c)),.01);
  return a.map(x=>`<div class="wy"><span>${TR[x.f]||x.f}</span><span>${fv(x.f,x.v)}</span><span class="wb"><i class="${x.c>=0?"inc "+k:"dec"}" style="width:${Math.abs(x.c)/m*50}%;${x.c>=0?"left":"right"}:50%"></i></span></div>`).join("")}
-function badge(e){return e.result==null?'<span class="badge b-wait">bekliyor</span>':e.hit?'<span class="badge b-ok">tuttu</span>':`<span class="badge b-no">${e.result==="ikisi"?"iki yöne de gitti":"tutmadı"}</span>`}
+function badge(e){return e.result==null?'<span class="badge b-wait">bekliyor</span>':e.hit?'<span class="badge b-ok">tuttu</span>':`<span class="badge b-no">${e.result==="belirsiz"?"sıra belirsiz":e.result==="ikisi"?"iki yöne de gitti":"tutmadı"}</span>`}
 function detail(s){
  const c=D.coins.find(x=>x.symbol===s),th=Math.round(D.threshold*100),I=c.ind,h=D.track.filter(e=>e.sym===s).slice(0,8);
  $("#dlg").innerHTML=`<div class="dh"><div><h2 style="margin:0;font-size:28px">${s}</h2><div class="note">$${fmtP(c.price)} · 24s ${c.chg24>=0?"+":""}${c.chg24.toFixed(1)}% · hacim ${fmtV(c.volume)}</div></div><button class="x">Kapat</button></div>
  <div class="pp"><div><div class="big pos">${pc(c.p_up)}</div><div class="note">+%${th} yönlü olasılık (ort. ${pc(D.metrics.up.base_rate)})</div></div><div><div class="big neg">${pc(c.p_dn)}</div><div class="note">-%${th} yönlü olasılık (ort. ${pc(D.metrics.dn.base_rate)})</div></div></div>
  ${spark(c.spark,600,110,2)}<div class="note">Son 72 saatlik fiyat</div>
- <div class="inds">${Object.entries(I).map(([f,v])=>`<div><span>${TR[f]}</span><b>${fv(f,v)}</b></div>`).join("")}</div>
- <h3 class="pos">Yükseliş skoru neden bu?</h3>${why("up",c)}<h3 class="neg">Düşüş skoru neden bu?</h3>${why("dn",c)}
- <p class="note">Çubuk sağa uzuyorsa o özellik olasılığı artırıyor, sola uzuyorsa azaltıyor. Değerler coinin şu anki durumu.</p>
+ <div class="inds">${Object.entries(I).map(([f,v])=>`<div><span>${TR[f]||f}</span><b>${fv(f,v)}</b></div>`).join("")}</div>
+ <p class="note">${c.book?`Spread ${pc(c.book.spread)} · ±%1 bid ${fmtV(c.book.bid_depth_usdt)} / ask ${fmtV(c.book.ask_depth_usdt)}${c.book.depth_truncated?" (defter limiti nedeniyle alt sınır)":""}`:"Emir defteri verisi yok"}. İzleme/delist: ${c.monitoring?.status==="warning"?"uyarı":c.monitoring?.status==="no_warning_reported"?"uyarı bildirilmedi":"bilinmiyor"}. Güven: veri bütünlüğü ve kalibrasyon örneği göstergesi; istatistiksel güven aralığı değildir.</p><h3 class="pos">Yükseliş skoru neden bu?</h3>${why("up",c)}<h3 class="neg">Düşüş skoru neden bu?</h3>${why("dn",c)}
+ <p class="note">Çubuklar kalibrasyon öncesi modelin ham skoruna katkıyı gösterir; kalibre edilmiş olasılığa doğrudan katkı değildir. Çubuk sağa uzuyorsa o özellik olasılığı artırıyor, sola uzuyorsa azaltıyor. Değerler coinin şu anki durumu.</p>
  <h3>Bu coinin geçmiş tahminleri</h3>${h.length?`<div class="tw"><table><tr><th>Zaman</th><th>Yön</th><th>Skor</th><th>Maks ↑</th><th>Maks ↓</th><th>Sonuç</th></tr>${h.map(e=>`<tr><td>${dt(e.t)}</td><td>${e.side==="up"?"Yükseliş":"Düşüş"}</td><td>${pc(e.p)}</td><td>${pc(e.max_up)}</td><td>${pc(e.max_dn)}</td><td>${badge(e)}</td></tr>`).join("")}</table></div>`:'<p class="note">Henüz sonuçlanmış tahmin yok.</p>'}`;
  $("#dlg").showModal();
 }
 function track(){
  const th=Math.round(D.threshold*100),box=k=>{const r=hitRate(k),b=D.metrics[k].base_rate;return`<div class="box ${k}"><h2>${k==="up"?"Yükseliş":"Düşüş"} tahminleri</h2><div class="big ${k==="up"?"pos":"neg"}">${r.n?pc(r.h/r.n):"-"}</div><div class="note">${r.n?`${r.n} sonuçlanan tahminden ${r.h} tanesi tuttu`:"Henüz sonuçlanan yok"}. Rastgele seçimde beklenen: ${pc(b)}</div></div>`};
  const rows=D.track.slice(0,60);
- $("#v-track").innerHTML=`<div class="g2">${box("up")}${box("dn")}</div><div class="box"><h2>Kayıt defteri</h2><p class="sub">Her güncellemede her yönden en yüksek 10 coin kaydedilir; ${D.horizon} saat sonra "tuttu" demek, fiyatın ${th}% hareketi tersine ${th}% gitmeden yaptığı anlamına gelir.</p>
- ${rows.length||D.pending.length?`<div class="tw"><table><tr><th>Zaman</th><th>Coin</th><th>Yön</th><th>Skor</th><th>Fiyat</th><th>Maks ↑</th><th>Maks ↓</th><th>Sonuç</th></tr>${[...D.pending.slice().reverse().map(e=>({...e,max_up:null})),...rows].map(e=>`<tr><td>${dt(e.t)}</td><td><b>${e.sym}</b></td><td>${e.side==="up"?"Yükseliş":"Düşüş"}</td><td>${pc(e.p)}</td><td>$${fmtP(e.price)}</td><td>${e.max_up==null?"-":pc(e.max_up)}</td><td>${e.max_dn==null?"-":pc(e.max_dn)}</td><td>${badge(e)}</td></tr>`).join("")}</table></div>`:'<p class="note">Henüz kayıt yok.</p>'}</div>`;
+ $("#v-track").innerHTML=`<div class="g2">${box("up")}${box("dn")}</div><div class="box"><h2>Kayıt defteri</h2><p class="sub">Her güncellemede her yönden en yüksek 10 coin kaydedilir; ${D.horizon} saat sonra "tuttu" demek, fiyatın ${th}% hareketi tersine ${th}% gitmeden yaptığı anlamına gelir. Takip, tahmin yayınlandıktan sonraki ilk tam mumun açılış fiyatından başlar; bu fiyat modelin son kapanış fiyatından farklı olabilir.</p>
+ ${rows.length||D.pending.length?`<div class="tw"><table><tr><th>Zaman</th><th>Coin</th><th>Yön</th><th>Skor</th><th>Fiyat</th><th>Maks ↑</th><th>Maks ↓</th><th>Sonuç</th></tr>${[...D.pending.slice().reverse().map(e=>({...e,max_up:null})),...rows].map(e=>`<tr><td>${dt(e.t)}</td><td><b>${e.sym}</b></td><td>${e.side==="up"?"Yükseliş":"Düşüş"}</td><td>${pc(e.p)}</td><td>${e.price==null?"sonraki açılış":`$${fmtP(e.price)}`}</td><td>${e.max_up==null?"-":pc(e.max_up)}</td><td>${e.max_dn==null?"-":pc(e.max_dn)}</td><td>${badge(e)}</td></tr>`).join("")}</table></div>`:'<p class="note">Henüz kayıt yok.</p>'}</div>`;
 }
 function model(){
- const th=Math.round(D.threshold*100),bars=k=>`<div class="box ${k}"><h2>${k==="up"?"Yükseliş":"Düşüş"} modeli</h2><p class="sub">Test AUC ${D.metrics[k].auc??"-"} (0.5 = şans). En yüksek %2 dilimde isabet ${pc(D.metrics[k].precision_top2)}, ortalama ${pc(D.metrics[k].base_rate)}.</p>${D.importance[k].map(x=>`<div class="bar2"><span>${TR[x.f]||x.f}</span><i style="width:${x.w*2.4}%"></i><span>${x.w}%</span></div>`).join("")}</div>`;
- $("#v-model").innerHTML=`<div class="box" style="margin-bottom:20px"><h2>Model nasıl karar veriyor?</h2><ol class="steps"><li>Binance'ten ${D.meta.coins} coinin saatlik mumları çekilir (${D.meta.data_from.slice(0,10)} - ${D.meta.data_to.slice(0,10)}).</li><li>Her saat için ${D.meta.features} özellik hesaplanır: getiriler, oynaklık, hacim, RSI, zirve ve dibe uzaklık, EMA farkı.</li><li>Her saatin sonrası bilinir: sonraki ${D.horizon} saatte fiyat ${th}% yukarı mı gitti, aşağı mı? Bu etiketle LightGBM modeli eğitilir.</li><li>Modeli dürüst test etmek için verinin son %20'si eğitimde kullanılmaz; rakamlar o bölümden gelir.</li><li>Güncel mumlar modele verilir, çıkan olasılık skor olur. Her coinin detayında hangi özelliğin skoru ne kadar etkilediği görünür.</li></ol></div><div class="g2">${bars("up")}${bars("dn")}</div><p class="note">Soldaki çubuklar özelliğin model için genel önemidir (kazanç payı).</p>`;
+ const legacy=D.label_version!=="first_touch_v1";
+ const bars=k=>{const m=D.metrics[k];return `<div class="box ${k}"><h2>${k==="up"?"Yükseliş":"Düşüş"} modeli</h2><p class="sub">${legacy?`Eski test AUC ${m.auc??"-"}; eski üst %2 isabet ${pc(m.precision_top2)}.`:`Walk-forward AUC ${m.auc==null?"-":m.auc.toFixed(3)} · Brier ${m.brier.toFixed(4)} · precision@10 ${pc(m.precision_top10)} · baz oran ${pc(m.base_rate)} (${m.test_rows} örnek).`}</p>${D.importance[k].map(x=>`<div class="bar2"><span>${TR[x.f]||x.f}</span><i style="width:${Math.min(100,x.w*2.4)}%"></i><span>${x.w}%</span></div>`).join("")}${legacy?"":`<h3>Kalibrasyon eğrisi</h3><div class="tw"><table><tr><th>Tahmin ort.</th><th>Gerçekleşme</th><th>Örnek</th></tr>${m.calibration_curve.map(b=>`<tr><td>${pc(b.mean_probability)}</td><td>${pc(b.event_rate)}</td><td>${b.count}</td></tr>`).join("")}</table></div>`}</div>`};
+ $("#v-model").innerHTML=`<div class="box" style="margin-bottom:20px"><h2>Model nasıl karar veriyor?</h2><p>İlk eşik teması hedeflenir; aynı mumda iki eşik de görülürse sıra belirsizdir. Walk-forward bölmeleri, eğitim/kalibrasyon/test arasında etiket ufku kadar boşluk ve örtüşmeyen eğitim örnekleri kullanır. Isotonic kalibrasyon ayrı geçmiş dönemle yapılır.</p><p>Mevcut evren ve likidite filtreleri geçmiş değerlendirmeye seçim yanlılığı katabilir. Güncel emir defteri modele tarihsel veri olarak verilmez; likidasyon verisi kullanılamıyor. İzleme/delist bilgisi bilinmiyor olabilir.</p>${legacy?"Yeni rapor henüz oluşturulmadı.":'<a href="report.json">Ayrıntılı rapor (JSON)</a>'}</div><div class="g2">${bars("up")}${bars("dn")}</div><p class="note">Çubuklar nihai modeldeki kazanç önemidir.</p>`;
 }
 </script>
 </body>
