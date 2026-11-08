@@ -80,8 +80,9 @@ def feats(df):
 def labels(df):
     hi = df.h[::-1].rolling(H).max()[::-1].shift(-1)  # sonraki H saatin en yükseği
     lo = df.l[::-1].rolling(H).min()[::-1].shift(-1)
-    up = (hi / df.c - 1 >= TH).astype(float).where(hi.notna())
-    dn = (lo / df.c - 1 <= -TH).astype(float).where(lo.notna())
+    ux, dx = hi / df.c - 1 >= TH, lo / df.c - 1 <= -TH
+    up = (ux & ~dx).astype(float).where(hi.notna())
+    dn = (dx & ~ux).astype(float).where(lo.notna())
     return pd.DataFrame({"y_up": up, "y_dn": dn})
 
 
