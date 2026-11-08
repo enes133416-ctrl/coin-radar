@@ -4,85 +4,155 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Coin Radar</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#eef1f5;--ink:#14202e;--mute:#5d6b7c;--line:#d5dbe3;--card:#fff;--up:#0b7a6b;--dn:#c2365a;--upbg:#dff1ee;--dnbg:#f8e1e7}
 @media(prefers-color-scheme:dark){:root{--bg:#10161d;--ink:#e7ecf2;--mute:#92a0b1;--line:#27313d;--card:#17202a;--up:#3ecfb8;--dn:#ff7b9c;--upbg:#12332f;--dnbg:#3b1a25}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Schibsted Grotesk",system-ui,sans-serif;font-variant-numeric:tabular-nums}
-main{max-width:1180px;margin:0 auto;padding:40px 20px 56px}
-h1{font-size:clamp(34px,6vw,64px);line-height:1;margin:0 0 12px;font-weight:800;letter-spacing:-.03em}
-.lead{max-width:62ch;color:var(--mute);margin:0 0 24px}
-.bar{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-bottom:24px}
-input{flex:1;min-width:200px;max-width:320px;padding:10px 14px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font:inherit}
-input:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
-#upd{color:var(--mute);font-size:14px}
+main{max-width:1180px;margin:0 auto;padding:36px 20px 56px}
+h1{font-size:clamp(34px,6vw,60px);line-height:1;margin:0 0 10px;font-weight:800;letter-spacing:-.03em}
+.lead{max-width:66ch;color:var(--mute);margin:0 0 22px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:22px}
+.stats div{background:var(--card);padding:12px 16px}.stats b{display:block;font-size:20px}.stats span{font-size:13px;color:var(--mute)}
+nav{display:flex;gap:6px;border-bottom:1px solid var(--line);margin-bottom:18px}
+nav button{background:none;border:0;border-bottom:3px solid transparent;padding:10px 14px;font:inherit;font-weight:700;color:var(--mute);cursor:pointer}
+nav button[aria-selected=true]{color:var(--ink);border-color:var(--ink)}
+.tools{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:18px}
+input,select{padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font:inherit}
+input[type=search]{min-width:200px}
+:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+label.chk{display:flex;gap:6px;align-items:center;color:var(--mute);font-size:14px}
 .cols{display:grid;grid-template-columns:1fr 1fr;gap:20px}
 @media(max-width:860px){.cols{grid-template-columns:1fr}}
-.col{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:20px}
-.col h2{margin:0;font-size:24px;letter-spacing:-.01em}
-.up h2{color:var(--up)}.dn h2{color:var(--dn)}
-.sub{margin:4px 0 4px;color:var(--mute);font-size:14px}
-.met{margin:0 0 16px;font-size:13px;color:var(--mute)}
-.row{display:grid;grid-template-columns:78px 1fr;gap:4px 14px;padding:12px 0;border-top:1px solid var(--line);align-items:center}
-.sym{font-weight:700;font-size:18px}
-.meter{position:relative;height:26px;background:var(--bg);border-radius:6px;overflow:hidden}
-.fill{height:100%;border-radius:6px}
-.up .fill{background:var(--up)}.dn .fill{background:var(--dn)}
+.col,.box{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:20px}
+.col h2,.box h2{margin:0 0 2px;font-size:22px}
+.up h2,.pos{color:var(--up)}.dn h2,.neg{color:var(--dn)}
+.sub{margin:0 0 14px;color:var(--mute);font-size:14px}
+.row{display:grid;grid-template-columns:28px 64px 1fr;gap:4px 8px;padding:11px 0;border-top:1px solid var(--line);align-items:center;cursor:pointer}
+.row:hover .sym{text-decoration:underline}
+.star{background:none;border:0;font-size:18px;color:var(--mute);cursor:pointer;padding:0}.star.on{color:#d9a400}
+.sym{font-weight:700;font-size:17px}
+.meter{position:relative;height:24px;background:var(--bg);border-radius:6px;overflow:hidden}
+.fill{height:100%}.up .fill{background:var(--up)}.dn .fill{background:var(--dn)}
 .tick{position:absolute;top:0;bottom:0;width:2px;background:var(--ink);opacity:.55}
-.val{position:absolute;left:8px;top:0;line-height:26px;font-weight:700;font-size:14px;color:#fff;mix-blend-mode:normal;text-shadow:0 0 3px rgba(0,0,0,.45)}
-.meta{grid-column:2;font-size:13px;color:var(--mute);display:flex;gap:14px;flex-wrap:wrap}
-.pos{color:var(--up)}.neg{color:var(--dn)}
+.val{position:absolute;left:8px;line-height:24px;font-weight:700;font-size:13px;color:#fff;text-shadow:0 0 3px rgba(0,0,0,.5)}
+.meta{grid-column:2/4;font-size:13px;color:var(--mute);display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.more{margin-top:10px;background:none;border:1px solid var(--line);border-radius:8px;padding:8px 14px;color:var(--ink);font:inherit;cursor:pointer}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:8px 10px;border-top:1px solid var(--line);white-space:nowrap}th{color:var(--mute);font-weight:500;border-top:0}
+.tw{overflow-x:auto}
+.badge{padding:2px 8px;border-radius:20px;font-size:12px;font-weight:700}
+.b-ok{background:var(--upbg);color:var(--up)}.b-no{background:var(--dnbg);color:var(--dn)}.b-wait{background:var(--bg);color:var(--mute)}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px}@media(max-width:860px){.g2{grid-template-columns:1fr}}
+.big{font-size:34px;font-weight:800;line-height:1.1}
+.bar2{display:grid;grid-template-columns:190px 1fr 46px;gap:8px;align-items:center;font-size:14px;margin:6px 0}
+.bar2 i{display:block;height:10px;border-radius:5px}.up .bar2 i{background:var(--up)}.dn .bar2 i{background:var(--dn)}
+.steps{max-width:70ch;padding-left:20px;color:var(--ink)}.steps li{margin:6px 0}
+dialog{width:min(780px,94vw);max-height:90vh;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);padding:22px}
+dialog::backdrop{background:rgba(0,0,0,.55)}
+.dh{display:flex;justify-content:space-between;align-items:start;gap:12px}.x{background:none;border:1px solid var(--line);border-radius:8px;color:var(--ink);padding:6px 12px;cursor:pointer;font:inherit}
+.pp{display:flex;gap:28px;margin:10px 0}
+.inds{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:14px 0}
+.inds div{border:1px solid var(--line);border-radius:8px;padding:8px 10px}.inds span{display:block;font-size:12px;color:var(--mute)}
+.wy{display:grid;grid-template-columns:190px 70px 1fr;gap:8px;align-items:center;font-size:14px;margin:5px 0}
+.wb{position:relative;height:10px;background:var(--bg);border-radius:5px}.wb i{position:absolute;top:0;bottom:0;border-radius:5px}
+.inc.up{background:var(--up)}.inc.dn{background:var(--dn)}.dec{background:var(--mute);opacity:.6}
+h3{margin:18px 0 6px;font-size:16px}.note{font-size:13px;color:var(--mute)}
 #msg{padding:16px;border:1px solid var(--line);border-radius:10px;background:var(--card)}
-footer{margin-top:28px;color:var(--mute);font-size:13px;max-width:75ch}
+@media(max-width:600px){.bar2,.wy{grid-template-columns:120px 1fr 40px}}
 </style>
 </head>
 <body>
 <main>
-  <h1>Coin Radar</h1>
-  <p class="lead" id="lead">Binance geçmiş verisinden öğrenen model, her coin için kısa vadede büyük hareket olasılığını hesaplar.</p>
-  <div id="msg" hidden>Veri bulunamadı. <code>python scanner.py</code> çalıştır, sonra bu sayfayı bir sunucu üzerinden aç (<code>python -m http.server</code>).</div>
-  <div class="bar" id="bar" hidden>
-    <input id="q" type="search" placeholder="Coin ara, örn. SOL" aria-label="Coin ara">
-    <span id="upd"></span>
-  </div>
-  <div class="cols" id="cols" hidden>
-    <section class="col up"><h2>Yükseliş adayları</h2><p class="sub" id="s-up"></p><p class="met" id="m-up"></p><div id="l-up"></div></section>
-    <section class="col dn"><h2>Düşüş adayları</h2><p class="sub" id="s-dn"></p><p class="met" id="m-dn"></p><div id="l-dn"></div></section>
-  </div>
-  <footer>Dikey çizgi, test döneminde bu olayın ortalama gerçekleşme oranını gösterir. Çubuk çizgiyi ne kadar geçiyorsa model o coini o kadar ayrıştırıyor demektir. Bu sayfa yatırım tavsiyesi değildir; olasılıklar yüksek görünse bile %10 hareketin gerçekleşmemesi normaldir.</footer>
+<h1>Coin Radar</h1>
+<p class="lead" id="lead">Yükleniyor...</p>
+<div id="msg" hidden>Veri bulunamadı. Actions sekmesinden <b>update-data</b> iş akışını çalıştır.</div>
+<div id="app" hidden>
+<div class="stats" id="stats"></div>
+<nav role="tablist"><button role="tab" data-t="pred" aria-selected="true">Tahminler</button><button role="tab" data-t="track" aria-selected="false">Takip</button><button role="tab" data-t="model" aria-selected="false">Model</button></nav>
+<section id="v-pred">
+<div class="tools"><input id="q" type="search" placeholder="Coin ara, örn. SOL" aria-label="Coin ara">
+<select id="sort" aria-label="Sırala"><option value="p">Olasılığa göre</option><option value="volume">Hacme göre</option><option value="chg24">24s değişime göre</option></select>
+<label class="chk"><input type="checkbox" id="fav"> Sadece favoriler</label></div>
+<div class="cols"><section class="col up"><h2>Yükseliş adayları</h2><p class="sub" id="s-up"></p><div id="l-up"></div></section>
+<section class="col dn"><h2>Düşüş adayları</h2><p class="sub" id="s-dn"></p><div id="l-dn"></div></section></div>
+</section>
+<section id="v-track" hidden></section>
+<section id="v-model" hidden></section>
+</div>
+<p class="note" style="margin-top:26px;max-width:75ch">Yatırım tavsiyesi değildir. Olasılıklar geçmiş veriye dayanır; %10 hareket nadir bir olaydır ve yüksek skor bile çoğu zaman gerçekleşmeme demektir. Dikey çizgi, test döneminde olayın ortalama gerçekleşme oranıdır.</p>
 </main>
+<dialog id="dlg"></dialog>
 <script>
 const $=s=>document.querySelector(s);
+const TR={ret1:"1s getiri",ret3:"3s getiri",ret6:"6s getiri",ret12:"12s getiri",ret24:"24s getiri",ret48:"48s getiri",ret120:"5 gün getiri",vol24:"24s oynaklık",vol72:"72s oynaklık",vol_ratio:"Oynaklık oranı (24s/72s)",range24:"24s fiyat aralığı",atr14:"Ort. mum boyu (14s)",to_hi24:"24s zirvesine uzaklık",to_lo24:"24s dibine uzaklık",to_hi120:"5g zirvesine uzaklık",to_lo120:"5g dibine uzaklık",volx:"Hacim / 24s ortalama",volx3:"3s hacim / 72s ort.",rsi:"RSI (14)",ema_gap:"EMA12 / EMA48 farkı"};
+const NP=["rsi","vol_ratio","volx","volx3"];
+const fv=(f,v)=>v==null?"-":f==="rsi"?v.toFixed(0):NP.includes(f)?v.toFixed(2)+"×":(v*100).toFixed(1)+"%";
 const fmtP=p=>p>=1?p.toLocaleString("en-US",{maximumFractionDigits:2}):p.toPrecision(3);
 const fmtV=v=>v>=1e9?(v/1e9).toFixed(1)+" Mr $":(v/1e6).toFixed(0)+" Mn $";
-let D;
-fetch("data.json?"+Date.now()).then(r=>{if(!r.ok)throw 0;return r.json()}).then(d=>{D=d;init()}).catch(()=>{$("#msg").hidden=false});
+const pc=x=>"%"+(x*100).toFixed(1);
+const dt=s=>new Date(s+(s.endsWith("Z")?"":"Z")).toLocaleString("tr-TR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
+let D,favs=[],lim={up:15,dn:15};
+try{favs=JSON.parse(localStorage.getItem("fav")||"[]")}catch(e){}
+const saveFav=()=>{try{localStorage.setItem("fav",JSON.stringify(favs))}catch(e){}};
+function spark(a,w=84,h=26,sw=1.6){const mn=Math.min(...a),r=Math.max(...a)-mn||1,p=a.map((v,i)=>`${(i/(a.length-1)*w).toFixed(1)},${(h-(v-mn)/r*(h-3)-1.5).toFixed(1)}`).join(" ");
+return `<svg viewBox="0 0 ${w} ${h}" width="${w<200?w:"100%"}" height="${h<200&&w<200?h:"auto"}" aria-hidden="true"><polyline points="${p}" fill="none" stroke="${a[a.length-1]>=a[0]?"var(--up)":"var(--dn)"}" stroke-width="${sw}" stroke-linejoin="round"/></svg>`}
+fetch("data.json?"+Date.now()).then(r=>{if(!r.ok)throw 0;return r.json()}).then(d=>{D=d;init()}).catch(()=>{$("#msg").hidden=false;$("#lead").textContent=""});
+const hitRate=k=>{const r=D.track.filter(e=>e.side===k);return{n:r.length,h:r.filter(e=>e.hit).length}};
 function init(){
-  const th=Math.round(D.threshold*100);
-  $("#lead").textContent=`Önümüzdeki ${D.horizon} saatte fiyatın en az %${th} yükselme veya %${th} düşme olasılığı. Model, Binance'teki ${D.coins.length} hacimli coinin saatlik geçmişinden öğrenir.`;
-  $("#upd").textContent="Güncelleme: "+new Date(D.generated).toLocaleString("tr-TR");
-  for(const k of ["up","dn"]){
-    const m=D.metrics[k], sign=k==="up"?"+":"-";
-    $("#s-"+k).textContent=`${D.horizon} saat içinde ${sign}%${th} görme olasılığı`;
-    $("#m-"+k).textContent=`Test: AUC ${m.auc??"-"}. En yüksek %2 dilimde isabet %${(m.precision_top2*100).toFixed(1)}, ortalama %${(m.base_rate*100).toFixed(1)}.`;
-  }
-  ["bar","cols"].forEach(i=>$("#"+i).hidden=false);
-  $("#q").addEventListener("input",render);
-  render();
+ const th=Math.round(D.threshold*100),m=D.meta;
+ $("#lead").textContent=`Önümüzdeki ${D.horizon} saatte fiyatın %${th} yükselip aşağı inmeden (veya tersi) hareket etme olasılığı. Model, Binance'teki ${m.coins} hacimli coinin saatlik geçmişinden öğrenir; her çalışmada tahminler kaydedilir ve ${D.horizon} saat sonra gerçekle karşılaştırılır.`;
+ const u=hitRate("up"),d=hitRate("dn"),all=u.n+d.n,hh=u.h+d.h;
+ $("#stats").innerHTML=[[new Date(D.generated).toLocaleString("tr-TR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}),"Son güncelleme"],[m.candles.toLocaleString("tr-TR"),`mum (${m.data_from.slice(5,10)} - ${m.data_to.slice(5,10)})`],[m.train_rows.toLocaleString("tr-TR"),`eğitim örneği, ${m.features} özellik`],[all?pc(hh/all):"Bekliyor",all?`canlı isabet (${all} tahmin)`:"canlı takip sonucu"]].map(x=>`<div><b>${x[0]}</b><span>${x[1]}</span></div>`).join("");
+ for(const k of["up","dn"])$("#s-"+k).textContent=`${D.horizon} saatte ${k==="up"?"+":"-"}%${th} görüp tersine ${k==="up"?"-":"+"}%${th} görmeme olasılığı`;
+ $("#app").hidden=false;
+ document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{document.querySelectorAll("nav button").forEach(x=>x.setAttribute("aria-selected",x===b));for(const t of["pred","track","model"])$("#v-"+t).hidden=t!==b.dataset.t});
+ ["q","sort","fav"].forEach(i=>$("#"+i).addEventListener("input",()=>{lim={up:15,dn:15};render()}));
+ render();track();model();
 }
 function render(){
-  const q=$("#q").value.trim().toUpperCase();
-  for(const k of ["up","dn"]){
-    const key="p_"+k, base=D.metrics[k].base_rate;
-    const all=[...D.coins].sort((a,b)=>b[key]-a[key]);
-    const max=Math.max(all[0][key],base)*1.15||1;
-    const rows=all.filter(c=>c.symbol.includes(q)).slice(0,q?50:15);
-    $("#l-"+k).innerHTML=rows.map(c=>`<div class="row"><div class="sym">${c.symbol}</div>
-      <div class="meter" role="img" aria-label="olasılık %${(c[key]*100).toFixed(1)}"><div class="fill" style="width:${c[key]/max*100}%"></div><div class="tick" style="left:${base/max*100}%"></div><span class="val">%${(c[key]*100).toFixed(1)}</span></div>
-      <div class="meta"><span>$${fmtP(c.price)}</span><span class="${c.chg24>=0?"pos":"neg"}">24s ${c.chg24>=0?"+":""}${c.chg24.toFixed(1)}%</span><span>Hacim ${fmtV(c.volume)}</span></div></div>`).join("")||'<p class="sub">Eşleşen coin yok.</p>';
-  }
+ const q=$("#q").value.trim().toUpperCase(),key=$("#sort").value,fo=$("#fav").checked;
+ for(const k of["up","dn"]){
+  const base=D.metrics[k].base_rate,all=[...D.coins].sort((a,b)=>b["p_"+k]-a["p_"+k]),max=Math.max(all[0]["p_"+k],base)*1.15||1;
+  let rows=all.filter(c=>c.symbol.includes(q)&&(!fo||favs.includes(c.symbol)));
+  if(key!=="p")rows.sort((a,b)=>Math.abs(b[key])-Math.abs(a[key]));
+  const more=rows.length>lim[k]&&!q;
+  $("#l-"+k).innerHTML=rows.slice(0,q?60:lim[k]).map(c=>{const p=c["p_"+k],f=favs.includes(c.symbol);return`<div class="row" data-s="${c.symbol}"><button class="star${f?" on":""}" data-f="${c.symbol}" aria-label="Favori">${f?"★":"☆"}</button><div class="sym">${c.symbol}</div>
+  <div class="meter" role="img" aria-label="olasılık ${pc(p)}"><div class="fill" style="width:${p/max*100}%"></div><div class="tick" style="left:${base/max*100}%"></div><span class="val">${pc(p)}</span></div>
+  <div class="meta">${spark(c.spark,72,22,1.4)}<span>$${fmtP(c.price)}</span><span class="${c.chg24>=0?"pos":"neg"}">24s ${c.chg24>=0?"+":""}${c.chg24.toFixed(1)}%</span><span>${fmtV(c.volume)}</span></div></div>`}).join("")||'<p class="sub">Eşleşen coin yok.</p>';
+  if(more)$("#l-"+k).insertAdjacentHTML("beforeend",`<button class="more" data-m="${k}">Daha fazla göster</button>`);
+ }
+}
+document.addEventListener("click",e=>{
+ const f=e.target.closest("[data-f]");if(f){e.stopPropagation();const s=f.dataset.f;favs=favs.includes(s)?favs.filter(x=>x!==s):[...favs,s];saveFav();render();return}
+ const m=e.target.closest("[data-m]");if(m){lim[m.dataset.m]+=15;render();return}
+ const r=e.target.closest(".row");if(r)detail(r.dataset.s);
+ if(e.target.id==="dlg"||e.target.closest(".x"))$("#dlg").close();
+});
+function why(k,c){const a=c["why_"+k],m=Math.max(...a.map(x=>Math.abs(x.c)),.01);
+ return a.map(x=>`<div class="wy"><span>${TR[x.f]||x.f}</span><span>${fv(x.f,x.v)}</span><span class="wb"><i class="${x.c>=0?"inc "+k:"dec"}" style="width:${Math.abs(x.c)/m*50}%;${x.c>=0?"left":"right"}:50%"></i></span></div>`).join("")}
+function badge(e){return e.result==null?'<span class="badge b-wait">bekliyor</span>':e.hit?'<span class="badge b-ok">tuttu</span>':`<span class="badge b-no">${e.result==="ikisi"?"iki yöne de gitti":"tutmadı"}</span>`}
+function detail(s){
+ const c=D.coins.find(x=>x.symbol===s),th=Math.round(D.threshold*100),I=c.ind,h=D.track.filter(e=>e.sym===s).slice(0,8);
+ $("#dlg").innerHTML=`<div class="dh"><div><h2 style="margin:0;font-size:28px">${s}</h2><div class="note">$${fmtP(c.price)} · 24s ${c.chg24>=0?"+":""}${c.chg24.toFixed(1)}% · hacim ${fmtV(c.volume)}</div></div><button class="x">Kapat</button></div>
+ <div class="pp"><div><div class="big pos">${pc(c.p_up)}</div><div class="note">+%${th} yönlü olasılık (ort. ${pc(D.metrics.up.base_rate)})</div></div><div><div class="big neg">${pc(c.p_dn)}</div><div class="note">-%${th} yönlü olasılık (ort. ${pc(D.metrics.dn.base_rate)})</div></div></div>
+ ${spark(c.spark,600,110,2)}<div class="note">Son 72 saatlik fiyat</div>
+ <div class="inds">${Object.entries(I).map(([f,v])=>`<div><span>${TR[f]}</span><b>${fv(f,v)}</b></div>`).join("")}</div>
+ <h3 class="pos">Yükseliş skoru neden bu?</h3>${why("up",c)}<h3 class="neg">Düşüş skoru neden bu?</h3>${why("dn",c)}
+ <p class="note">Çubuk sağa uzuyorsa o özellik olasılığı artırıyor, sola uzuyorsa azaltıyor. Değerler coinin şu anki durumu.</p>
+ <h3>Bu coinin geçmiş tahminleri</h3>${h.length?`<div class="tw"><table><tr><th>Zaman</th><th>Yön</th><th>Skor</th><th>Maks ↑</th><th>Maks ↓</th><th>Sonuç</th></tr>${h.map(e=>`<tr><td>${dt(e.t)}</td><td>${e.side==="up"?"Yükseliş":"Düşüş"}</td><td>${pc(e.p)}</td><td>${pc(e.max_up)}</td><td>${pc(e.max_dn)}</td><td>${badge(e)}</td></tr>`).join("")}</table></div>`:'<p class="note">Henüz sonuçlanmış tahmin yok.</p>'}`;
+ $("#dlg").showModal();
+}
+function track(){
+ const th=Math.round(D.threshold*100),box=k=>{const r=hitRate(k),b=D.metrics[k].base_rate;return`<div class="box ${k}"><h2>${k==="up"?"Yükseliş":"Düşüş"} tahminleri</h2><div class="big ${k==="up"?"pos":"neg"}">${r.n?pc(r.h/r.n):"-"}</div><div class="note">${r.n?`${r.n} sonuçlanan tahminden ${r.h} tanesi tuttu`:"Henüz sonuçlanan yok"}. Rastgele seçimde beklenen: ${pc(b)}</div></div>`};
+ const rows=D.track.slice(0,60);
+ $("#v-track").innerHTML=`<div class="g2">${box("up")}${box("dn")}</div><div class="box"><h2>Kayıt defteri</h2><p class="sub">Her güncellemede her yönden en yüksek 10 coin kaydedilir; ${D.horizon} saat sonra "tuttu" demek, fiyatın ${th}% hareketi tersine ${th}% gitmeden yaptığı anlamına gelir.</p>
+ ${rows.length||D.pending.length?`<div class="tw"><table><tr><th>Zaman</th><th>Coin</th><th>Yön</th><th>Skor</th><th>Fiyat</th><th>Maks ↑</th><th>Maks ↓</th><th>Sonuç</th></tr>${[...D.pending.slice().reverse().map(e=>({...e,max_up:null})),...rows].map(e=>`<tr><td>${dt(e.t)}</td><td><b>${e.sym}</b></td><td>${e.side==="up"?"Yükseliş":"Düşüş"}</td><td>${pc(e.p)}</td><td>$${fmtP(e.price)}</td><td>${e.max_up==null?"-":pc(e.max_up)}</td><td>${e.max_dn==null?"-":pc(e.max_dn)}</td><td>${badge(e)}</td></tr>`).join("")}</table></div>`:'<p class="note">Henüz kayıt yok.</p>'}</div>`;
+}
+function model(){
+ const th=Math.round(D.threshold*100),bars=k=>`<div class="box ${k}"><h2>${k==="up"?"Yükseliş":"Düşüş"} modeli</h2><p class="sub">Test AUC ${D.metrics[k].auc??"-"} (0.5 = şans). En yüksek %2 dilimde isabet ${pc(D.metrics[k].precision_top2)}, ortalama ${pc(D.metrics[k].base_rate)}.</p>${D.importance[k].map(x=>`<div class="bar2"><span>${TR[x.f]||x.f}</span><i style="width:${x.w*2.4}%"></i><span>${x.w}%</span></div>`).join("")}</div>`;
+ $("#v-model").innerHTML=`<div class="box" style="margin-bottom:20px"><h2>Model nasıl karar veriyor?</h2><ol class="steps"><li>Binance'ten ${D.meta.coins} coinin saatlik mumları çekilir (${D.meta.data_from.slice(0,10)} - ${D.meta.data_to.slice(0,10)}).</li><li>Her saat için ${D.meta.features} özellik hesaplanır: getiriler, oynaklık, hacim, RSI, zirve ve dibe uzaklık, EMA farkı.</li><li>Her saatin sonrası bilinir: sonraki ${D.horizon} saatte fiyat ${th}% yukarı mı gitti, aşağı mı? Bu etiketle LightGBM modeli eğitilir.</li><li>Modeli dürüst test etmek için verinin son %20'si eğitimde kullanılmaz; rakamlar o bölümden gelir.</li><li>Güncel mumlar modele verilir, çıkan olasılık skor olur. Her coinin detayında hangi özelliğin skoru ne kadar etkilediği görünür.</li></ol></div><div class="g2">${bars("up")}${bars("dn")}</div><p class="note">Soldaki çubuklar özelliğin model için genel önemidir (kazanç payı).</p>`;
 }
 </script>
 </body>
