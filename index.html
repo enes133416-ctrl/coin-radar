@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coin Radar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef1f5;--ink:#14202e;--mute:#5d6b7c;--line:#d5dbe3;--card:#fff;--up:#0b7a6b;--dn:#c2365a;--upbg:#dff1ee;--dnbg:#f8e1e7}
+@media(prefers-color-scheme:dark){:root{--bg:#10161d;--ink:#e7ecf2;--mute:#92a0b1;--line:#27313d;--card:#17202a;--up:#3ecfb8;--dn:#ff7b9c;--upbg:#12332f;--dnbg:#3b1a25}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Schibsted Grotesk",system-ui,sans-serif;font-variant-numeric:tabular-nums}
+main{max-width:1180px;margin:0 auto;padding:40px 20px 56px}
+h1{font-size:clamp(34px,6vw,64px);line-height:1;margin:0 0 12px;font-weight:800;letter-spacing:-.03em}
+.lead{max-width:62ch;color:var(--mute);margin:0 0 24px}
+.bar{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-bottom:24px}
+input{flex:1;min-width:200px;max-width:320px;padding:10px 14px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font:inherit}
+input:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
+#upd{color:var(--mute);font-size:14px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:860px){.cols{grid-template-columns:1fr}}
+.col{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:20px}
+.col h2{margin:0;font-size:24px;letter-spacing:-.01em}
+.up h2{color:var(--up)}.dn h2{color:var(--dn)}
+.sub{margin:4px 0 4px;color:var(--mute);font-size:14px}
+.met{margin:0 0 16px;font-size:13px;color:var(--mute)}
+.row{display:grid;grid-template-columns:78px 1fr;gap:4px 14px;padding:12px 0;border-top:1px solid var(--line);align-items:center}
+.sym{font-weight:700;font-size:18px}
+.meter{position:relative;height:26px;background:var(--bg);border-radius:6px;overflow:hidden}
+.fill{height:100%;border-radius:6px}
+.up .fill{background:var(--up)}.dn .fill{background:var(--dn)}
+.tick{position:absolute;top:0;bottom:0;width:2px;background:var(--ink);opacity:.55}
+.val{position:absolute;left:8px;top:0;line-height:26px;font-weight:700;font-size:14px;color:#fff;mix-blend-mode:normal;text-shadow:0 0 3px rgba(0,0,0,.45)}
+.meta{grid-column:2;font-size:13px;color:var(--mute);display:flex;gap:14px;flex-wrap:wrap}
+.pos{color:var(--up)}.neg{color:var(--dn)}
+#msg{padding:16px;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+footer{margin-top:28px;color:var(--mute);font-size:13px;max-width:75ch}
+</style>
+</head>
+<body>
+<main>
+  <h1>Coin Radar</h1>
+  <p class="lead" id="lead">Binance geçmiş verisinden öğrenen model, her coin için kısa vadede büyük hareket olasılığını hesaplar.</p>
+  <div id="msg" hidden>Veri bulunamadı. <code>python scanner.py</code> çalıştır, sonra bu sayfayı bir sunucu üzerinden aç (<code>python -m http.server</code>).</div>
+  <div class="bar" id="bar" hidden>
+    <input id="q" type="search" placeholder="Coin ara, örn. SOL" aria-label="Coin ara">
+    <span id="upd"></span>
+  </div>
+  <div class="cols" id="cols" hidden>
+    <section class="col up"><h2>Yükseliş adayları</h2><p class="sub" id="s-up"></p><p class="met" id="m-up"></p><div id="l-up"></div></section>
+    <section class="col dn"><h2>Düşüş adayları</h2><p class="sub" id="s-dn"></p><p class="met" id="m-dn"></p><div id="l-dn"></div></section>
+  </div>
+  <footer>Dikey çizgi, test döneminde bu olayın ortalama gerçekleşme oranını gösterir. Çubuk çizgiyi ne kadar geçiyorsa model o coini o kadar ayrıştırıyor demektir. Bu sayfa yatırım tavsiyesi değildir; olasılıklar yüksek görünse bile %10 hareketin gerçekleşmemesi normaldir.</footer>
+</main>
+<script>
+const $=s=>document.querySelector(s);
+const fmtP=p=>p>=1?p.toLocaleString("en-US",{maximumFractionDigits:2}):p.toPrecision(3);
+const fmtV=v=>v>=1e9?(v/1e9).toFixed(1)+" Mr $":(v/1e6).toFixed(0)+" Mn $";
+let D;
+fetch("data.json?"+Date.now()).then(r=>{if(!r.ok)throw 0;return r.json()}).then(d=>{D=d;init()}).catch(()=>{$("#msg").hidden=false});
+function init(){
+  const th=Math.round(D.threshold*100);
+  $("#lead").textContent=`Önümüzdeki ${D.horizon} saatte fiyatın en az %${th} yükselme veya %${th} düşme olasılığı. Model, Binance'teki ${D.coins.length} hacimli coinin saatlik geçmişinden öğrenir.`;
+  $("#upd").textContent="Güncelleme: "+new Date(D.generated).toLocaleString("tr-TR");
+  for(const k of ["up","dn"]){
+    const m=D.metrics[k], sign=k==="up"?"+":"-";
+    $("#s-"+k).textContent=`${D.horizon} saat içinde ${sign}%${th} görme olasılığı`;
+    $("#m-"+k).textContent=`Test: AUC ${m.auc??"-"}. En yüksek %2 dilimde isabet %${(m.precision_top2*100).toFixed(1)}, ortalama %${(m.base_rate*100).toFixed(1)}.`;
+  }
+  ["bar","cols"].forEach(i=>$("#"+i).hidden=false);
+  $("#q").addEventListener("input",render);
+  render();
+}
+function render(){
+  const q=$("#q").value.trim().toUpperCase();
+  for(const k of ["up","dn"]){
+    const key="p_"+k, base=D.metrics[k].base_rate;
+    const all=[...D.coins].sort((a,b)=>b[key]-a[key]);
+    const max=Math.max(all[0][key],base)*1.15||1;
+    const rows=all.filter(c=>c.symbol.includes(q)).slice(0,q?50:15);
+    $("#l-"+k).innerHTML=rows.map(c=>`<div class="row"><div class="sym">${c.symbol}</div>
+      <div class="meter" role="img" aria-label="olasılık %${(c[key]*100).toFixed(1)}"><div class="fill" style="width:${c[key]/max*100}%"></div><div class="tick" style="left:${base/max*100}%"></div><span class="val">%${(c[key]*100).toFixed(1)}</span></div>
+      <div class="meta"><span>$${fmtP(c.price)}</span><span class="${c.chg24>=0?"pos":"neg"}">24s ${c.chg24>=0?"+":""}${c.chg24.toFixed(1)}%</span><span>Hacim ${fmtV(c.volume)}</span></div></div>`).join("")||'<p class="sub">Eşleşen coin yok.</p>';
+  }
+}
+</script>
+</body>
+</html>
