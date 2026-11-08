@@ -1,4 +1,4 @@
-"""Coin Radar: Binance geçmiş verisiyle kısa vadede ±%10 hareket olasılığını tahmin eder.
+"""Coin Radar v2: Binance geçmiş verisiyle kısa vadede ±%10 hareket olasılığını tahmin eder.
 Çıktı: docs/data.json (web arayüzü bunu okur)."""
 import os, json, time
 from datetime import datetime, timezone
@@ -10,6 +10,7 @@ TOP_N = int(os.getenv("TOP_N", 80))                 # hacme göre ilk N coin
 MIN_VOL = float(os.getenv("MIN_VOLUME_USDT", 5e6))  # 24s min hacim
 PAGES = int(os.getenv("PAGES", 3))                  # 1 sayfa = 1000 saatlik mum
 H = int(os.getenv("HORIZON_H", 24))                 # tahmin ufku (saat)
+TOPK = 10  # takip için her yönden kaydedilen coin
 TH = float(os.getenv("THRESHOLD", 0.10))            # hedef hareket (%10)
 OUT = os.getenv("OUT", "docs/data.json")
 SKIP = {"USDC", "FDUSD", "TUSD", "USDP", "DAI", "EUR", "TRY", "USD1", "XUSD", "AEUR", "PAXG", "WBTC", "WBETH"}
@@ -81,8 +82,8 @@ def labels(df):
     hi = df.h[::-1].rolling(H).max()[::-1].shift(-1)  # sonraki H saatin en yükseği
     lo = df.l[::-1].rolling(H).min()[::-1].shift(-1)
     ux, dx = hi / df.c - 1 >= TH, lo / df.c - 1 <= -TH
-    up = (ux & ~dx).astype(float).where(hi.notna())
-    dn = (dx & ~ux).astype(float).where(lo.notna())
+    up = (ux & ~dx).astype(float).where(hi.notna())  # sadece yukarı giden
+    dn = (dx & ~ux).astype(float).where(lo.notna())  # sadece aşağı giden
     return pd.DataFrame({"y_up": up, "y_dn": dn})
 
 
@@ -98,10 +99,37 @@ def fit_eval(X, y, ts):
     return lgb.LGBMClassifier(**PARAMS).fit(X, y), m
 
 
+def num(x):
+    x = float(x)
+    return round(x, 5) if np.isfinite(x) else None
+
+
+def resolve(pending, dfs, now):
+    """Vadesi dolan tahminleri gerçekleşen fiyatla karşılaştırır."""
+    done, keep = [], []
+    for e in pending:
+        t0, df = pd.Timestamp(e["t"]), dfs.get(e["sym"] + "USDT")
+        if df is None or df.index[-1] < t0 + pd.Timedelta(hours=H - 1):
+            if now - t0 < pd.Timedelta(hours=H * 3):
+                keep.append(e)
+            continue
+        w = df[(df.index >= t0) & (df.index < t0 + pd.Timedelta(hours=H))]
+        up, dn = w.h.max() / e["price"] - 1, w.l.min() / e["price"] - 1
+        ux, dx = up >= TH, dn <= -TH
+        res = "ikisi" if ux and dx else "yukari" if ux else "asagi" if dx else "yok"
+        hit = res == ("yukari" if e["side"] == "up" else "asagi")
+        done.append({**e, "max_up": round(float(up), 4), "max_dn": round(float(dn), 4), "result": res, "hit": bool(hit)})
+    return done, keep
+
+
 def main():
+    try:
+        prev = json.load(open(OUT, encoding="utf-8"))
+    except Exception:
+        prev = {}
     uni = universe()
     print(len(uni), "coin taranıyor...")
-    frames, last = [], {}
+    frames, last, dfs = [], {}, {}
     for x in uni:
         s = x["symbol"]
         try:
@@ -115,6 +143,7 @@ def main():
         d = f.join(labels(df))
         d["sym"] = s
         frames.append(d)
+        dfs[s] = df
         last[s] = (f.iloc[-1], float(df.c.iloc[-1]), x)
     data = pd.concat(frames)
     cols = [c for c in data.columns if c not in ("y_up", "y_dn", "sym")]
@@ -122,19 +151,48 @@ def main():
     X, ts = tr[cols], tr.index.values
     syms = list(last)
     Xl = pd.DataFrame([last[s][0] for s in syms])[cols]
-    res, metrics = {}, {}
-    for name in ("up", "dn"):
-        model, metrics[name] = fit_eval(X, tr[f"y_{name}"].astype(int), ts)
-        res[name] = model.predict_proba(Xl)[:, 1]
-        print(name, metrics[name])
-    coins = [dict(symbol=s[:-4], price=last[s][1], chg24=float(last[s][2]["priceChangePercent"]),
-                  volume=float(last[s][2]["quoteVolume"]), p_up=round(float(res["up"][i]), 4),
-                  p_dn=round(float(res["dn"][i]), 4)) for i, s in enumerate(syms)]
+    res, metrics, contrib, imp = {}, {}, {}, {}
+    for k in ("up", "dn"):
+        model, metrics[k] = fit_eval(X, tr[f"y_{k}"].astype(int), ts)
+        res[k] = model.predict_proba(Xl)[:, 1]
+        contrib[k] = model.predict(Xl, pred_contrib=True)  # her özelliğin karardaki payı
+        g = model.booster_.feature_importance("gain")
+        imp[k] = [dict(f=cols[j], w=round(float(g[j] / g.sum() * 100), 1)) for j in np.argsort(-g)[:8]]
+        print(k, metrics[k])
+    coins = []
+    for i, s in enumerate(syms):
+        row, c = last[s][0], dfs[s].c
+        d = dict(symbol=s[:-4], price=last[s][1], chg24=float(last[s][2]["priceChangePercent"]),
+                 volume=float(last[s][2]["quoteVolume"]), p_up=round(float(res["up"][i]), 4),
+                 p_dn=round(float(res["dn"][i]), 4),
+                 spark=[round(float(v), 4) for v in (c.tail(72) / c.tail(72).iloc[0]).values],
+                 ind={k: num(row[k]) for k in ("rsi", "ret6", "ret24", "ret120", "vol24", "volx", "range24",
+                                                "to_hi24", "to_lo24", "ema_gap", "atr14")})
+        for k in ("up", "dn"):
+            cc = contrib[k][i][:-1]
+            d["why_" + k] = [dict(f=cols[j], v=num(Xl.iloc[i, j]), c=round(float(cc[j]), 3))
+                             for j in np.argsort(-np.abs(cc))[:5]]
+        coins.append(d)
+    # --- takip: eski tahminleri değerlendir, yenilerini kaydet ---
+    now = pd.Timestamp(datetime.now(timezone.utc).replace(tzinfo=None))
+    done, keep = resolve(prev.get("pending", []), dfs, now)
+    track = (done + prev.get("track", []))[:400]
+    t0 = max(d.index[-1] for d in dfs.values()) + pd.Timedelta(hours=1)
+    seen = {(e["t"], e["sym"], e["side"]) for e in keep + track}
+    for k in ("up", "dn"):
+        for c in sorted(coins, key=lambda c: -c["p_" + k])[:TOPK]:
+            e = dict(t=t0.isoformat(), sym=c["symbol"], side=k, p=c["p_" + k], price=c["price"])
+            if (e["t"], e["sym"], k) not in seen:
+                keep.append(e)
+    out = dict(generated=datetime.now(timezone.utc).isoformat(), horizon=H, threshold=TH, metrics=metrics,
+               importance=imp, coins=coins, pending=keep[-200:], track=track,
+               meta=dict(coins=len(coins), candles=int(sum(len(d) for d in dfs.values())), train_rows=int(len(tr)),
+                         features=len(cols), data_from=str(min(d.index[0] for d in dfs.values()))[:16],
+                         data_to=str(t0)[:16]))
     os.makedirs(os.path.dirname(OUT) or ".", exist_ok=True)
     with open(OUT, "w", encoding="utf-8") as fh:
-        json.dump(dict(generated=datetime.now(timezone.utc).isoformat(), horizon=H, threshold=TH,
-                       metrics=metrics, coins=coins), fh, ensure_ascii=False)
-    print("yazıldı:", OUT)
+        json.dump(out, fh, ensure_ascii=False, allow_nan=False)
+    print("yazıldı:", OUT, "| yeni sonuçlanan:", len(done), "| bekleyen:", len(keep))
 
 
 if __name__ == "__main__":
