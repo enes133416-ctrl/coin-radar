@@ -2,7 +2,7 @@ import json
 import unittest
 import numpy as np
 import pandas as pd
-from radar.data import monitoring
+from radar.data import Binance, monitoring
 from radar.features import features, add_futures, labels
 from radar.model import split_at, assert_no_leakage, evaluate, thin
 from scanner import resolve
@@ -12,6 +12,26 @@ with open('config.json', encoding='utf-8') as f:
 
 
 class RadarTests(unittest.TestCase):
+    def test_universe_volume_threshold_and_no_default_count_limit(self):
+        symbols = [{'symbol': f'C{i}USDT', 'baseAsset': f'C{i}', 'quoteAsset': 'USDT', 'status': 'TRADING'} for i in range(200)]
+        symbols += [{'symbol': 'LOWUSDT', 'baseAsset': 'LOW', 'quoteAsset': 'USDT', 'status': 'TRADING'},
+                    {'symbol': 'USDCUSDT', 'baseAsset': 'USDC', 'quoteAsset': 'USDT', 'status': 'TRADING'},
+                    {'symbol': 'STOPUSDT', 'baseAsset': 'STOP', 'quoteAsset': 'USDT', 'status': 'BREAK'},
+                    {'symbol': 'CEUR', 'baseAsset': 'C', 'quoteAsset': 'EUR', 'status': 'TRADING'}]
+        rows = [{'symbol': f'C{i}USDT', 'quoteVolume': str(250000 + i)} for i in range(200)]
+        rows += [{'symbol': 'LOWUSDT', 'quoteVolume': '249999.99'},
+                 *[{'symbol': x, 'quoteVolume': '1000000'} for x in ['USDCUSDT', 'STOPUSDT', 'CEUR']]]
+        api = Binance(CFG)
+        api.spot = lambda path: {'symbols': symbols} if path.endswith('exchangeInfo') else rows
+        result = api.universe()
+        self.assertEqual(CFG['min_volume_usdt'], 250000)
+        self.assertIsNone(CFG['top_n'])
+        self.assertEqual(len(result), 200)
+        self.assertEqual(result[0]['symbol'], 'C199USDT')
+        self.assertEqual(result[-1]['symbol'], 'C0USDT')  # threshold is inclusive
+        api.cfg = dict(CFG, top_n=10)
+        self.assertEqual(len(api.universe()), 10)
+
     def test_first_touch_and_ambiguous(self):
         idx = pd.date_range('2024-01-01', periods=5, freq='h')
         df = pd.DataFrame({'c': [100]*5, 'h': [100, 111, 100, 100, 100], 'l': [100, 99, 89, 100, 100]}, index=idx)

@@ -1,8 +1,8 @@
 {
   "spot_base": "https://data-api.binance.vision",
   "futures_base": "https://fapi.binance.com",
-  "top_n": 150,
-  "min_volume_usdt": 5000000,
+  "top_n": null,
+  "min_volume_usdt": 250000,
   "min_history_hours": 720,
   "kline_pages": 3,
   "horizon_hours": 24,

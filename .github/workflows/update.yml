@@ -18,7 +18,7 @@ jobs:
         with: {python-version: "3.11", cache: pip}
       - run: pip install -r requirements.txt
       - run: python -m unittest discover -s tests -v
-      - run: node --test tests/test_price_history_browser.js
+      - run: node --test tests/test_price_history_browser.js tests/test_prediction_listing.js
       - run: python scanner.py
       - if: ${{ github.event_name != 'workflow_dispatch' || !inputs.dry_run }}
         run: |

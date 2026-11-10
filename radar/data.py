@@ -36,7 +36,9 @@ class Binance:
                    and s.get('quoteAsset') == 'USDT' and s.get('baseAsset') not in self.cfg['skip_assets']}
         rows = [dict(x, exchange_info=symbols[x['symbol']]) for x in self.spot('/api/v3/ticker/24hr')
                 if x['symbol'] in symbols and float(x['quoteVolume']) >= self.cfg['min_volume_usdt']]
-        return sorted(rows, key=lambda x: -float(x['quoteVolume']))[:self.cfg['top_n']]
+        rows.sort(key=lambda x: -float(x['quoteVolume']))
+        limit = self.cfg.get('top_n')
+        return rows if limit is None else rows[:limit]
 
     def klines(self, symbol):
         out, end = [], None

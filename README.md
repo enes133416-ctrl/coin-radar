@@ -16,11 +16,11 @@ cd docs
 python -m http.server 8000
 ```
 
-Tarayıcıda `http://localhost:8000` adresini açın. PowerShell etkinleştirmeyi engellerse aktivasyon yerine `.\.venv\Scripts\python.exe` ile komutları çalıştırın. Tarama Binance spot ve Futures API'lerine ağ erişimi gerektirir ve 150 coin için zaman alabilir. Bazı coğrafyalarda API'ler engellenebilir veya Futures verileri belirli pariteler için bulunmayabilir; eksik veriler ve atlanan coinler rapora yazılır. Spot/BTC erişimi veya yeterli eğitim verisi yoksa işlem hata verir; eski çıktı güncellenmez.
+Tarayıcıda `http://localhost:8000` adresini açın. PowerShell etkinleştirmeyi engellerse aktivasyon yerine `.\.venv\Scripts\python.exe` ile komutları çalıştırın. Tarama Binance spot ve Futures API'lerine ağ erişimi gerektirir; coin sayısı arttığında daha fazla zaman ve bellek kullanabilir. Bazı coğrafyalarda API'ler engellenebilir veya Futures verileri belirli pariteler için bulunmayabilir; eksik veriler ve atlanan coinler rapora yazılır. Spot/BTC erişimi veya yeterli eğitim verisi yoksa işlem hata verir; eski çıktı güncellenmez.
 
 ## Ayarlar ve dosyalar
 
-Tüm çalışma parametreleri `config.json` içindedir. Varsayılanlar: en yüksek hacimli 150 USDT paritesi, en az 5 milyon USDT günlük hacim, 720 saat kesintisiz geçmiş, %0,5 azami spread ve orta fiyatın ±%1'inde her yönde en az 50.000 USDT derinlik. Spread, orta fiyata bölünmüş alış-satış farkıdır. Emir defteri limiti derinlik bandını kapsamıyorsa ölçüm alt sınırdır; filtre yine de ölçülen miktarı kullanır. Kitap alınamazsa coin elenir. Stable/fiat/wrapped dışlama listesi yapılandırmadadır ve kapsamlı bir varlık sınıflandırması değildir.
+Tüm çalışma parametreleri `config.json` içindedir. Varsayılanlar: sayı sınırı olmadan uygun USDT pariteleri, en az 250.000 USDT son 24 saatlik işlem hacmi, 720 saat kesintisiz geçmiş, %0,5 azami spread ve orta fiyatın ±%1'inde her yönde en az 50.000 USDT derinlik. Spread, orta fiyata bölünmüş alış-satış farkıdır. Emir defteri limiti derinlik bandını kapsamıyorsa ölçüm alt sınırdır; filtre yine de ölçülen miktarı kullanır. Kitap alınamazsa coin elenir. Stable/fiat/wrapped dışlama listesi yapılandırmadadır ve kapsamlı bir varlık sınıflandırması değildir.
 
 - `radar/data.py`: spot mumlar ve defter, Futures funding, OI, global/top trader long-short, izleme etiketi kontrolü.
 - `radar/features.py`: geçmişe dönük özellikler, BTC rejimi, UTC zamanı, ATR, Bollinger, 7/30 günlük zirve/dip ve oynaklık z-skoru; ilk temas etiketleri.
@@ -28,7 +28,7 @@ Tüm çalışma parametreleri `config.json` içindedir. Varsayılanlar: en yüks
 - `scanner.py`: iş akışı ve tahmin takibi; `docs/data.json`: web verileri; `docs/report.json`: bölme metrikleri, kalibrasyon eğrileri, korelasyon matrisi, özellik seçimleri ve atlamalar. Dosyalar başarılı taramada üretilir.
 - `docs/index.html`: web arayüzü; `tests/test_radar.py`: testler.
 
-Örneğin `top_n`, `max_spread_pct`, `min_depth_usdt_per_side`, `correlation_threshold` ve `min_importance_pct` yapılandırmadan değiştirilebilir. `atr_target_enabled: true` ile sabit %10 hedefi yanında ATR% × `atr_multiplier` (belirtilen alt/üst sınırlar içinde) için ikinci bir walk-forward karşılaştırması rapora eklenir; arayüzdeki tahminler yine sabit %10 hedefidir. Funding saatine kalan süre varsayılan 8 saatlik UTC çizelgesini kullanır; sözleşmeye özel funding sıklığı değişikliklerini yansıtmayabilir.
+Varsayılan `top_n: null` tüm uygun pariteleri tarar; bir sayı verilirse yalnızca hacme göre en yüksek o kadar parite taranır. Örneğin `top_n`, `max_spread_pct`, `min_depth_usdt_per_side`, `correlation_threshold` ve `min_importance_pct` yapılandırmadan değiştirilebilir. `atr_target_enabled: true` ile sabit %10 hedefi yanında ATR% × `atr_multiplier` (belirtilen alt/üst sınırlar içinde) için ikinci bir walk-forward karşılaştırması rapora eklenir; arayüzdeki tahminler yine sabit %10 hedefidir. Funding saatine kalan süre varsayılan 8 saatlik UTC çizelgesini kullanır; sözleşmeye özel funding sıklığı değişikliklerini yansıtmayabilir.
 
 ## Yöntem ve kısıtlar
 
