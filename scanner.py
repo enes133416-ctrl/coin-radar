@@ -7,6 +7,7 @@ import pandas as pd
 from radar.data import Binance, monitoring
 from radar.features import features, add_futures, labels
 from radar.model import evaluate
+from radar.price_history import update_history
 
 
 def num(x):
@@ -137,6 +138,8 @@ def main():
             prev = json.load(fh)
     except (OSError, ValueError):
         prev = {}
+    # Price snapshots have their own schema and do not depend on model label versions.
+    price_history = update_history(api, prev.get('price_history', []), coins, cfg['top_k'])
     # Legacy records used a different target, so don't mix them with first-touch scores.
     if prev.get('label_version') != 'first_touch_v1':
         prev = {}
@@ -160,7 +163,7 @@ def main():
                    'Universe and liquidity use current filters, so historical backtests have survivorship/selection bias.']}
     out = {'generated': report['generated'], 'label_version': 'first_touch_v1', 'horizon': h, 'threshold': cfg['threshold'],
            'metrics': metrics, 'importance': {k: b['importance'] for k, b in bundles.items()}, 'coins': coins,
-           'pending': keep[-200:], 'track': track,
+           'pending': keep[-200:], 'track': track, 'price_history': price_history,
            'meta': {'coins': len(coins), 'candles': sum(len(d) for d in dfs.values()), 'train_rows': len(data.dropna(subset=['y_up_fixed'])),
                     'features': len(cols), 'data_from': str(min(d.index[0] for d in dfs.values()))[:16],
                     'data_to': str(max(d.index[-1] for d in dfs.values()) + pd.Timedelta(hours=1))[:16]}}

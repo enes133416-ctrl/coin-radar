@@ -29,6 +29,9 @@ class PipelineTest(unittest.TestCase):
             def universe(self):
                 return [{'symbol': s, 'priceChangePercent': '1', 'quoteVolume': '10000000', 'exchange_info': {}} for s in frames]
             def klines(self, s): return frames[s]
+            def spot(self, path, **params):
+                assert path == '/api/v3/ticker/price'
+                return {'price': '123.45'}
             def book(self, s): return {'spread': .001, 'bid_depth_usdt': 100000., 'ask_depth_usdt': 100000., 'depth_truncated': False}
             def futures_history(self, s): return {'errors': [], 'current_oi': None}
 
@@ -45,6 +48,8 @@ class PipelineTest(unittest.TestCase):
                 with open('docs/report.json', encoding='utf-8') as f:
                     report = json.load(f)
                 self.assertEqual(len(output['coins']), 13)
+                self.assertEqual(len(output['price_history']), cfg['top_k'])
+                self.assertTrue(all(e['price'] == 123.45 and e['status'] == 'pending' for e in output['price_history']))
                 self.assertEqual(len(output['metrics']['up']['folds']), 2)
                 self.assertEqual(set(report['comparison']), {'fixed', 'atr'})
                 self.assertTrue(all(e['price'] is None for e in output['pending']))
