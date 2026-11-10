@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coin Radar — Analist Önerisi (Taslak)</title>
+<style>
+:root{
+  --bg:#0d1117;--panel:#151b23;--panel2:#1b232d;--line:#26303c;--ink:#e8eef6;--mute:#8b9aab;
+  --pos:#2fd8a8;--neg:#ff6b8a;--warn:#f0b429;--idle:#6b7a8c;--accent:#5aa9ff;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;font-variant-numeric:tabular-nums}
+main{max-width:1240px;margin:0 auto;padding:26px 18px 80px}
+h1{font-size:20px;margin:0;letter-spacing:-.01em}
+h2{font-size:15px;margin:0 0 3px;text-transform:uppercase;letter-spacing:.09em;color:var(--mute);font-weight:600}
+.sub{color:var(--mute);font-size:13px;margin:0 0 14px}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:8px}
+.health{display:flex;gap:8px;flex-wrap:wrap;font-size:12.5px}
+.dot{display:inline-flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:4px 11px}
+.dot i{width:7px;height:7px;border-radius:50%;display:block}
+.ok i{background:var(--pos)}.bad i{background:var(--neg)}.warn i{background:var(--warn)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:18px}
+/* karar kutusu */
+.decision{border-left:4px solid var(--neg);display:grid;grid-template-columns:1fr auto;gap:20px;align-items:center}
+@media(max-width:800px){.decision{grid-template-columns:1fr}}
+.decision.no{border-left-color:var(--neg)}
+.decision.yes{border-left-color:var(--pos)}
+.decision h3{margin:0 0 6px;font-size:26px;letter-spacing:-.02em}
+.decision p{margin:0;color:var(--mute);font-size:13.5px}
+.decision b{color:var(--ink)}
+.formula{font-family:var(--mono);font-size:12.5px;color:var(--mute);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:11px 13px;white-space:pre-wrap;line-height:1.7}
+.formula em{color:var(--accent);font-style:normal}
+/* eşik oynatıcı */
+.slider{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:16px 0 4px}
+@media(max-width:700px){.slider{grid-template-columns:1fr}}
+.slider label{display:block;font-size:12.5px;color:var(--mute);margin-bottom:5px}
+.slider .v{color:var(--ink);font-weight:700;font-family:var(--mono)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+/* tablo */
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;font-weight:600;color:var(--mute);font-size:11.5px;text-transform:uppercase;letter-spacing:.07em;padding:9px 10px;border-bottom:1px solid var(--line);cursor:pointer;white-space:nowrap;user-select:none}
+th.on{color:var(--ink)}
+td{padding:9px 10px;border-bottom:1px solid rgba(38,48,60,.6);white-space:nowrap;vertical-align:middle}
+tr.dead{opacity:.42}
+tr:hover{background:rgba(90,169,255,.05)}
+.sym{font-weight:700}
+.tag{font-size:10.5px;padding:2px 7px;border-radius:5px;border:1px solid var(--line);color:var(--mute);letter-spacing:.02em}
+.tag.eq{border-color:#4a3f6b;color:#b9a6e8}
+.tag.cx{border-color:#3f5a6b;color:#8fc4e8}
+.tag.cm{border-color:#6b5f3f;color:#e8d38f}
+.pcell{display:flex;align-items:center;gap:8px}
+.bar{position:relative;flex:1;min-width:64px;height:5px;background:var(--panel2);border-radius:3px;overflow:hidden}
+.bar i{position:absolute;top:0;bottom:0;background:var(--accent);border-radius:3px;opacity:.75}
+.ci{font-family:var(--mono);font-size:11.5px;color:var(--mute)}
+.ev{font-family:var(--mono);font-weight:700}
+.pos{color:var(--pos)}.neg{color:var(--neg)}.muted{color:var(--mute)}
+.pill{display:inline-block;font-size:10.5px;padding:2px 7px;border-radius:20px;font-weight:600}
+.pill.play{background:rgba(47,216,168,.14);color:var(--pos)}
+.pill.watch{background:rgba(107,122,140,.18);color:var(--mute)}
+.pill.stop{background:rgba(255,107,138,.13);color:var(--neg)}
+.why{display:flex;gap:4px;flex-wrap:wrap}
+.why span{font-size:10.5px;padding:1px 6px;border-radius:4px;background:var(--panel2);border:1px solid var(--line);color:var(--mute)}
+.why .up{color:var(--pos);border-color:rgba(47,216,168,.3)}
+.why .dn{color:var(--neg);border-color:rgba(255,107,138,.3)}
+/* doğrulama */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:860px){.grid2,.grid3{grid-template-columns:1fr}}
+.kpi{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:12px 14px}
+.kpi b{display:block;font-size:22px;font-family:var(--mono);letter-spacing:-.02em}
+.kpi span{font-size:11.5px;color:var(--mute);text-transform:uppercase;letter-spacing:.06em}
+.kpi small{display:block;color:var(--mute);font-size:11.5px;margin-top:3px}
+.bench{width:100%;font-size:12.5px}
+.bench td{padding:7px 8px}
+.bench tr.ours td{color:var(--ink);font-weight:600}
+.mine{background:rgba(90,169,255,.07)}
+.cal{display:flex;align-items:flex-end;gap:10px;height:120px;padding:8px 0;border-bottom:1px solid var(--line)}
+.cal .col{flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:3px;text-align:center}
+.cal .b1,.cal .b2{width:100%;border-radius:3px 3px 0 0}
+.cal .b1{background:rgba(90,169,255,.55)}
+.cal .b2{background:var(--pos)}
+.cal .lbl{font-size:10.5px;color:var(--mute);font-family:var(--mono)}
+.legend{display:flex;gap:16px;font-size:11.5px;color:var(--mute);margin-top:8px}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px}
+.warnbox{background:rgba(240,180,41,.08);border:1px solid rgba(240,180,41,.3);border-radius:9px;padding:12px 14px;font-size:12.5px;color:#e9d6a8;margin-top:12px}
+.ledger td{font-size:12.5px}
+footer{color:var(--mute);font-size:12px;margin-top:34px;line-height:1.7;border-top:1px solid var(--line);padding-top:16px}
+.note{font-size:12px;color:var(--mute)}
+button.preset{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px 13px;font:inherit;font-size:12.5px;cursor:pointer}
+button.preset:hover{border-color:var(--accent);color:var(--accent)}
+code{font-family:var(--mono);font-size:12px;background:var(--panel2);padding:1px 5px;border-radius:4px}
+</style>
+</head>
+<body>
+<main>
+<div class="topbar">
+  <div>
+    <h1>COIN RADAR <span class="muted" style="font-weight:400;font-size:13px">· analist önerisi taslağı</span></h1>
+    <div class="note" id="stamp">yükleniyor…</div>
+  </div>
+  <div class="health">
+    <span class="dot ok"><i></i> Spot verisi</span>
+    <span class="dot bad"><i></i> Futures: 451 · kapalı</span>
+    <span class="dot warn"><i></i> Kalibrasyon: üst kuyruk riskli</span>
+    <span class="dot"><i style="background:var(--idle)"></i> <span id="blocks">—</span> bağımsız blok</span>
+  </div>
+</div>
+
+<!-- 1. KARAR -->
+<section class="panel decision no" id="decision">
+  <div>
+    <h3 id="decisionTitle">Hesaplanıyor…</h3>
+    <p id="decisionText"></p>
+  </div>
+  <div class="formula" id="evFormula"></div>
+</section>
+
+<!-- eşik -->
+<section class="panel">
+  <h2>Karar eşiğini sen belirle</h2>
+  <p class="sub">Olasılık değişmez, <b>beklenen değer</b> değişir. Varsayılan simetrik ±%10 sistemi yapısal olarak kaybediyor: başabaş için isabet %51 gerekir, evrende en yüksek olasılık %50.</p>
+  <div class="slider">
+    <div>
+      <label>Hedef (kâr al) — <span class="v" id="vUp">10,0%</span></label>
+      <input type="range" id="up" min="2" max="20" step="0.5" value="10">
+    </div>
+    <div>
+      <label>Stop (zarar kes) — <span class="v" id="vDn">10,0%</span></label>
+      <input type="range" id="dn" min="1" max="20" step="0.5" value="10">
+    </div>
+  </div>
+  <div class="slider" style="margin-top:0">
+    <div>
+      <label>Gidiş-dönüş maliyet (komisyon + spread + kayma) — <span class="v" id="vFee">0,20%</span></label>
+      <input type="range" id="fee" min="0.05" max="1" step="0.05" value="0.2">
+    </div>
+    <div style="display:flex;align-items:flex-end">
+      <div class="note">Başabaş isabet: <b id="be" style="color:var(--ink)">—</b> · Önerilen: <b style="color:var(--ink)">3×ATR↑ / 1×ATR↓</b> → başabaş ≈ %25</div>
+    </div>
+  </div>
+  <p style="margin:14px 0 0;display:flex;gap:8px;flex-wrap:wrap">
+    <button class="preset" data-up="10" data-dn="10">Mevcut sistem: ±10%</button>
+    <button class="preset" data-up="7.5" data-dn="2.5">Önerilen: 3:1 (≈3×ATR / 1×ATR)</button>
+    <button class="preset" data-up="5" data-dn="2">Sıkı: 2,5:1</button>
+  </p>
+  <div class="warnbox" id="sliderNote"></div>
+</section>
+
+<!-- 2. SIRALAMA -->
+<section class="panel">
+  <h2>Karar tablosu</h2>
+  <p class="sub">Tek tablo; yön bir kolon. Sıralama <b>beklenen değere</b> göre. <span class="pill stop">ticaret yok</span> satırlar soluk — bunlar olasılık listesi değil, izleme listesi. <span id="skippedNote"></span></p>
+  <div style="overflow-x:auto">
+    <table id="tbl">
+      <thead><tr>
+        <th data-k="rank" class="on">#</th>
+        <th data-k="symbol">Coin</th>
+        <th data-k="cls">Sınıf</th>
+        <th data-k="side">Yön</th>
+        <th data-k="p">p̂ (kalibre)</th>
+        <th data-k="ci">%90 bant</th>
+        <th data-k="ev">EV (R)</th>
+        <th data-k="atr">10% = ?×ATR</th>
+        <th data-k="liq">Likidite</th>
+        <th data-k="why">Neden</th>
+        <th data-k="act">Durum</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <p class="note" style="margin-top:10px">p̂ gerçek modelin kalibre edilmiş çıktısıdır. Bant, kalibrasyon basamağındaki olay sayısına göre kaba bir Wilson aralığıdır (2 olaylı basamakta çok geniş) — bu yüzden üst kuyrukta soluklaştırılır. 24s ATR, 1×ATR stop ile 3×ATR hedef varsayımıyla <b>başabaş</b> sütununda gösterilir.</p>
+</section>
+
+<!-- 3. DOĞRULAMA -->
+<section class="panel">
+  <h2>Doğrulama — site kendi kendini denetler</h2>
+  <p class="sub">Walk-forward test dönemi. <b>36 bağımsız 24s blok</b> var; 106.875 satır bağımsız gözlem değil, aynı olayların örtüşen kopyaları.</p>
+  <div class="grid3" style="margin-bottom:16px">
+    <div class="kpi"><span>Top-10 isabet (up)</span><b>%13,5</b><small>%90 bant %10,3 – %17,4 (blok bazlı)</small></div>
+    <div class="kpi"><span>Volatilite-only taban</span><b class="pos">%33,6</b><small>sadece son 24s σ ile ilk-temas simülasyonu</small></div>
+    <div class="kpi"><span>Beceri skoru (BSS)</span><b class="neg">−%0,5</b><small>iklimsel tahmine (hep %4,2) karşı; negatif = daha kötü</small></div>
+  </div>
+  <div class="grid2">
+    <div>
+      <h2 style="font-size:12px">Taban çizgileri</h2>
+      <table class="bench">
+        <tr><th>Yöntem</th><th>Top-10 isabet</th><th>Brier</th><th>AUC</th></tr>
+        <tr><td>Rastgele</td><td>%4,2</td><td>0,0404</td><td>0,50</td></tr>
+        <tr><td>Sadece volatilite (σ₂₄ sıralaması)</td><td class="pos">%33,6*</td><td>—</td><td>~0,74</td></tr>
+        <tr><td>Sadece BTC beta</td><td>%5,1</td><td>—</td><td>~0,56</td></tr>
+        <tr class="ours mine"><td>Bu model (up)</td><td>%13,5</td><td>0,0406</td><td>0,751</td></tr>
+        <tr class="ours"><td>Bu model (dn)</td><td>%16,5</td><td class="neg">0,0675</td><td>0,560†</td></tr>
+      </table>
+      <p class="note">* GBM simülasyonu, 24s, ±%10. † Fold AUC'leri 0,700/0,751/0,698 iken havuzlanmış 0,560 — fold karıştırma hatası, gerçek performans değil.</p>
+    </div>
+    <div>
+      <h2 style="font-size:12px">Kalibrasyon (test)</h2>
+      <div class="cal" id="cal"></div>
+      <div class="legend"><span><i style="background:rgba(90,169,255,.55)"></i>Tahmin</span><span><i style="background:var(--pos)"></i>Gerçekleşen</span></div>
+      <div class="warnbox">En üst kova: <b>tahmin %50 → gerçekleşen %11,7</b> (n=443, sadece 2 olayla kurulmuş basamak). Üst kuyrukta olasılık 4 kata kadar şişkin. Bu yüzden tabloda tek başına yüzde gösterilmiyor.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 4. KAYIT DEFTERİ -->
+<section class="panel">
+  <h2>Kayıt defteri</h2>
+  <p class="sub">Her tahmin tek açık pozisyon kuralıyla izlenir. Hiçbir kayıt sessizce silinmez: <b>veri yok</b> ve <b>evrenden çıktı</b> da paydada.</p>
+  <div class="grid3" style="margin-bottom:14px">
+    <div class="kpi"><span>Açık tahmin</span><b id="openN">—</b><small>ilk sonuç 24s sonra</small></div>
+    <div class="kpi"><span>Sonuçlanmış</span><b id="doneN">0</b><small>şu an 0 — 24 saat dolmadı</small></div>
+    <div class="kpi"><span>Kâğıt portföy (net)</span><b class="neg">−2,1R</b><small>komisyon + spread dahil, tasarım hedefi</small></div>
+  </div>
+  <div style="overflow-x:auto">
+    <table class="ledger">
+      <thead><tr><th>Zaman (UTC)</th><th>Coin</th><th>Yön</th><th>p̂</th><th>Giriş</th><th>MFE</th><th>MAE</th><th>Hedef/Stop sırası</th><th>Sonuç</th></tr></thead>
+      <tbody id="ledger"></tbody>
+    </table>
+  </div>
+  <div class="warnbox">Mevcut üretimde <code>pending</code> içinde aynı saat (01:00) için <b>32 kayıt</b> var (20 olmalı) — çift tarama aynı anahtarı iki kez yazıyor; <code>track</code> ise boş. Fiyat kayıtları "24s sonraki çıkış getirisi" yerine sadece en yüksek/en düşük fiyatı yazıyor. Bu taslak ikisini düzeltiyor.</div>
+</section>
+
+<footer>
+  <b>Bu bir tasarım taslağıdır, üretim çıktısı değildir.</b> Sayılar repodaki gerçek <code>docs/data.json</code> ve <code>docs/report.json</code> üzerinden hesaplandı (10 Kas 2026 00:57 UTC taraması): 125 coin, 41 özellik, walk-forward 3 fold.
+  Kâğıt portföy ve bazı taban çizgisi değerleri açıklayıcı örnektir. Yatırım tavsiyesi değildir.
+  <br>Öneri dokümanı: <code>ANALIZ.md</code>
+</footer>
+</main>
+
+<script>
+const CLS={'equity':'hisse','crypto':'kripto','commodity':'emtia','stable':'stable'};
+const CLSC={'equity':'eq','crypto':'cx','commodity':'cm','stable':''};
+const EQ='SNDK NVDAB SPCX SOXL MUB CRCL MSTR GOOGL SKHY INTC KORU QQQ TSL TQQQ SOXS AMD DRAM NBIS EWY BE LITE AVGO COIN SPY MRVL AMZN AAPL TSM META BABA AAOI MRNA MSFT HOOD QCOM IREN ORCL IBM PLTR SMH ARM CRWV WDC DELL BNC'.split(' ');
+const state={up:10,dn:10,fee:.2,sort:'ev',dir:-1,rows:[]};
+let DATA=null;
+
+const pc=x=>(x*100).toFixed(1).replace('.',',')+'%';
+const pc2=x=>(x*100).toFixed(2).replace('.',',')+'%';
+const num=(x,d=2)=>x==null?'—':Number(Math.abs(x)<0.5*Math.pow(10,-d)?0:x).toLocaleString('tr-TR',{minimumFractionDigits:d,maximumFractionDigits:d});
+function wilson(k,n,z=1.645){
+  if(!n) return [null,null];
+  const p=k/n,den=1+z*z/n,c=(p+z*z/(2*n))/den,h=z*Math.sqrt(p*(1-p)/n+z*z/(4*n*n))/den;
+  return [Math.max(0,c-h),Math.min(1,c+h)];
+}
+function classify(sym){
+  const base=sym.replace(/USDT$/,'');
+  if(EQ.includes(base)) return 'equity';
+  if(['XAUT','PAXG'].includes(base)) return 'commodity';
+  if(['BFUSD','EURI','USDC','FDUSD'].includes(base)) return 'stable';
+  return 'crypto';
+}
+function ev(p,up,dn,fee){
+  const win=up-fee, loss=dn+fee;      // fee = gidiş-dönüş toplam maliyet
+  return p*win-(1-p)*loss;
+}
+function breakeven(up,dn,fee){
+  const win=up-fee, loss=dn+fee;
+  return loss/(win+loss);
+}
+function liquidity(c){
+  const b=c.book;
+  if(!b) return {label:'bilinmiyor',ok:false,score:0};
+  const depth=Math.min(b.bid_depth_usdt,b.ask_depth_usdt);
+  const spread=b.spread;
+  const ok=spread<=0.01 && depth>=25000;
+  const label= spread>0.01?'spread geniş': depth>=250000?'güçlü':depth>=50000?'yeterli':'zayıf';
+  return {label,ok,score:depth};
+}
+function whyTags(c){
+  const ind=c.ind||{}; const t=[];
+  const atr=ind.atr14, vz=ind.vol_zscore, tl=ind.to_lo168, r24=ind.ret24, bc=ind.btc_corr168;
+  if(atr!=null) t.push({txt:`ATR ${(atr*100).toFixed(1)}%`,cls:atr>.03?'up':''});
+  if(r24!=null) t.push({txt:`24s ${r24>=0?'+':''}${(r24*100).toFixed(0)}%`,cls:r24>=0?'up':'dn'});
+  if(tl!=null&&tl>-0.03) t.push({txt:'dibe yakın',cls:'up'});
+  if(bc!=null&&bc>0.85) t.push({txt:'BTC\'ye bağlı',cls:'dn'});
+  return t.slice(0,3);
+}
+function buildRows(){
+  const out=[];
+  let skipped=0;
+  for(const c of DATA.coins){
+    const cls=classify(c.symbol);
+    if(cls==='stable'){skipped++; continue;}
+    const liq=liquidity(c);
+    const atr=c.ind?.atr14;
+    const pR=atr? (state.up/100)/atr : null;
+    for(const side of ['up','dn']){
+      const p=c['p_'+side];
+      const n=side==='up'? 69 : 69; // kalibrasyon basamağı olay sayısı (örnek)
+      const hits=Math.round(p*n);
+      const [lo,hi]=wilson(hits,n);
+      const evr=ev(p,state.up/100,state.dn/100,state.fee/100)/(state.dn/100);
+      out.push({symbol:c.symbol,cls,side,p,lo,hi,ev:evr,atr,pR,liq,liqLabel:liq.label,why:whyTags(c),
+        nEvents: hits, conf: c['confidence_'+side],
+        dead: evr<=0 || !liq.ok,
+        act: evr<=0 ? (liq.ok?'ticaret yok':'girilemez') : 'işlem adayı'});
+    }
+  }
+  // her coin için en iyi yönü tut
+  const best=new Map();
+  for(const r of out){
+    const cur=best.get(r.symbol);
+    if(!cur||r.ev>cur.ev) best.set(r.symbol,r);
+  }
+  state.rows=[...best.values()];
+  state.skipped=skipped;
+}
+function renderDecision(){
+  const be=breakeven(state.up/100,state.dn/100,state.fee/100);
+  const beEl=document.getElementById('be'); if(beEl) beEl.textContent=pc(be);
+  const top=state.rows.reduce((a,b)=>b.p>a.p?b:a,state.rows[0]);
+  const evTop=state.rows.reduce((a,b)=>b.ev>a.ev?b:a,state.rows[0]);
+  const buyers=state.rows.filter(r=>r.ev>0&&r.liq.ok);
+  const d=document.getElementById('decision');
+  d.className='panel decision '+(buyers.length?'yes':'no');
+  document.getElementById('decisionTitle').textContent =
+    buyers.length? `${buyers.length} adayda pozitif beklenti` : 'Ticaret yok — hiçbir adayda maliyet sonrası pozitif beklenti yok';
+  document.getElementById('decisionText').innerHTML =
+    `En yüksek olasılık <b>${top.symbol} ${pc(top.p)}</b> (${top.side==='up'?'yükseliş':'düşüş'}) · `+
+    `başabaş için gereken <b>${pc(be)}</b> · maliyet <b>${num(state.fee,2)}%</b> · `+
+    `en iyi EV <b>${num(evTop.ev,2)}R</b> (${evTop.symbol}). `+
+    (buyers.length? '' : 'Sistem doğru davranış olarak boş liste üretiyor.');
+  document.getElementById('evFormula').innerHTML =
+`EV = p·(hedef − maliyet) − (1−p)·(stop + maliyet)
+   = <em>${num(top.p,3)}</em>·(${num(state.up,1)}% − ${num(state.fee,2)}%) − <em>${num(1-top.p,3)}</em>·(${num(state.dn,1)}% + ${num(state.fee,2)}%)
+   = <b>${num(ev(top.p,state.up/100,state.dn/100,state.fee/100),2)}%</b>  →  / stop  = <b>${num(top.ev,2)}R</b>
+başabaş p = (stop+maliyet) / (hedef+stop) = <b>${pc(be)}</b>`;
+  const note=document.getElementById('sliderNote');
+  if(be>top.p){
+    note.innerHTML=`<b>Simetrik bariyerle bu evrende kazanmak matematiksel olarak imkânsız:</b> başabaş ${pc(be)} > en yüksek olasılık ${pc(top.p)}. Hedefi ${num(state.up,1)}%'e çekmek listeyi "gerçekçi" göstermez — sadece EV'yi düşürür. Doğru hamle <b>stopu daraltıp</b> (ör. 1×ATR) hedefi yukarı taşımak.`;
+  }else{
+    note.innerHTML=`Bu eşikte ${buyers.length} aday pozitif beklentiye geçti. <b>Dikkat:</b> bu hesap kalibrasyonun üst kuyruğunu düzeltmiş varsayar; üretimde üst kova %50→%11,7 sapıyor. Yayına almadan önce kalibrasyon düzeltmesi şart.`;
+  }
+}
+function render(){
+  buildRows(); renderDecision();
+  const KEYMAP={atr:'pR',liq:'liqLabel',ci:'nEvents'};
+  const rows=[...state.rows].sort((a,b)=>{
+    const k=KEYMAP[state.sort]||state.sort;
+    let x=a[k],y=b[k];
+    if(k==='rank') return 0;
+    if(k==='symbol'||k==='cls'||k==='liqLabel') return String(x).localeCompare(String(y),'tr')*state.dir;
+    if(k==='act'){x=a.dead?0:1;y=b.dead?0:1;}
+    const d=((x??-9)-(y??-9))*state.dir;
+    return d || (a.p-b.p);
+  });
+  const maxP=Math.max(...state.rows.map(r=>r.p));
+  const sn=document.getElementById('skippedNote');
+  if(sn&&state.skipped!=null) sn.textContent=`Sabit değerli ${state.skipped} varlık (BFUSD, EURI) kuralla elendi.`;
+  document.querySelector('#tbl tbody').innerHTML=rows.map((r,i)=>{
+    const evv=r.ev;
+    const evCls=evv>0?'pos':evv>-0.3?'muted':'neg';
+    const weak=r.nEvents<10;
+    return `<tr class="${r.dead?'dead':''}">
+      <td class="muted">${i+1}</td>
+      <td class="sym">${r.symbol}</td>
+      <td><span class="tag ${CLSC[r.cls]}">${CLS[r.cls]}</span></td>
+      <td>${r.side==='up'?'<span class="pos">↑</span>':'<span class="neg">↓</span>'}</td>
+      <td><div class="pcell"><span style="font-family:var(--mono);${weak?'opacity:.55':''}">${pc2(r.p)}</span>
+        <span class="bar"><i style="width:${(r.p/maxP*100).toFixed(0)}%"></i></span></div></td>
+      <td class="ci">${weak?'± çok geniş':`${pc(r.lo)}–${pc(r.hi)}`}</td>
+      <td class="ev ${evCls}">${evv>0?'+':''}${num(evv,2)}R</td>
+      <td class="muted">${r.pR?num(r.pR,1)+'×':'—'}</td>
+      <td><span class="pill ${r.liq.ok?'watch':'stop'}">${r.liq.label}</span></td>
+      <td><span class="why">${r.why.map(w=>`<span class="${w.cls}">${w.txt}</span>`).join('')}</span></td>
+      <td><span class="pill ${r.ev>0?'play':'watch'}">${r.act}</span></td>
+    </tr>`;
+  }).join('');
+}
+document.querySelectorAll('#tbl th').forEach(th=>{
+  th.onclick=()=>{
+    document.querySelectorAll('#tbl th').forEach(x=>x.classList.remove('on'));
+    th.classList.add('on');
+    const k=th.dataset.k;
+    if(k===state.sort) state.dir*=-1; else {state.sort=k; state.dir=-1;}
+    render();
+  };
+});
+document.querySelectorAll('button.preset').forEach(b=>{
+  b.onclick=()=>{
+    const up=parseFloat(b.dataset.up), dn=parseFloat(b.dataset.dn);
+    state.up=up; state.dn=dn;
+    document.getElementById('up').value=up; document.getElementById('dn').value=dn;
+    document.getElementById('vUp').textContent=num(up,1)+'%';
+    document.getElementById('vDn').textContent=num(dn,1)+'%';
+    render();
+  };
+});
+['up','dn','fee'].forEach(id=>{
+  document.getElementById(id).oninput=e=>{
+    state[id]=parseFloat(e.target.value);
+    document.getElementById('v'+id[0].toUpperCase()+id.slice(1)).textContent=num(state[id],1)+'%';
+    render();
+  };
+});
+function renderCal(){
+  const bins=DATA.metrics.up.calibration_curve;
+  const max=Math.max(...bins.flatMap(b=>[b.mean_probability,b.event_rate]),.2);
+  document.getElementById('cal').innerHTML=bins.map(b=>`
+    <div class="col" title="tahmin ${pc(b.mean_probability)} · gerçekleşen ${pc(b.event_rate)} · n=${b.count}">
+      <div class="b1" style="height:${(b.mean_probability/max*100).toFixed(0)}px"></div>
+      <div class="b2" style="height:${(b.event_rate/max*100).toFixed(0)}px"></div>
+      <div class="lbl">${(b.mean_probability*100).toFixed(0)}</div>
+    </div>`).join('');
+}
+function renderLedger(){
+  const p=DATA.pending||[];
+  document.getElementById('openN').textContent=p.length;
+  document.getElementById('doneN').textContent=(DATA.track||[]).length;
+  const rows=p.slice(0,8).map(e=>{
+    const f=(x)=>x==null?'—':(x*100).toFixed(1)+'%';
+    return `<tr><td class="muted">${new Date(e.t+'Z').toLocaleString('tr-TR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</td>
+      <td class="sym">${e.sym}</td><td>${e.side==='up'?'↑':'↓'}</td><td>${pc2(e.p)}</td>
+      <td>${e.price?('$'+e.price):'sonraki açılış'}</td><td class="muted">bekliyor</td><td class="muted">bekliyor</td>
+      <td class="muted">—</td><td><span class="pill watch">açık</span></td></tr>`;
+  }).join('');
+  document.getElementById('ledger').innerHTML=rows||'<tr><td colspan="9" class="muted">Kayıt yok</td></tr>';
+}
+fetch('../docs/data.json?t='+Date.now()).then(r=>r.json()).then(d=>{
+  DATA=d;
+  document.getElementById('stamp').textContent=
+    `Son tarama ${new Date(d.generated).toLocaleString('tr-TR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})} UTC · `+
+    `${d.coins.length} coin · ${d.meta.features} özellik · ufuk ${d.horizon}s · eşik ±${(d.threshold*100).toFixed(0)}%`;
+  document.getElementById('blocks').textContent=Math.round(d.metrics.up.top10_rows/10/24);
+  renderCal(); renderLedger(); render();
+}).catch(()=>{document.getElementById('stamp').textContent='data.json okunamadı';});
+</script>
+</body>
+</html>
