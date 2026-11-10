@@ -95,10 +95,10 @@ const NP=["rsi","vol_ratio","volx","volx3","vol_zscore","squeeze","btc_corr168",
 Object.assign(TR,{atr14:"ATR % (14s)",vol_zscore:"Oynaklık z-skoru",bb_width:"Bollinger genişliği",squeeze:"Sıkışma oranı",to_hi168:"7g zirve uzaklığı",to_lo168:"7g dip uzaklığı",to_hi720:"30g zirve uzaklığı",to_lo720:"30g dip uzaklığı",btc_ret1:"BTC 1s getiri",btc_ret4:"BTC 4s getiri",btc_ret24:"BTC 24s getiri",btc_vol24:"BTC oynaklığı",btc_corr168:"BTC 7g korelasyon",btc_beta168:"BTC 7g beta",funding_rate:"Funding",funding_mean24:"Funding 24s ort.",funding_change24:"Funding 24s değişimi",open_interest:"Açık pozisyon",oi_change1:"OI 1s değişim",oi_change4:"OI 4s değişim",oi_change24:"OI 24s değişim",global_ls:"Global long/short",top_ls:"Top trader long/short",utc_hour:"UTC saat",utc_weekday:"UTC gün",hours_to_funding:"Funding kalan saat"});
 const fv=(f,v)=>v==null?"-":f==="rsi"?v.toFixed(0):NP.includes(f)?v.toLocaleString("tr-TR",{maximumFractionDigits:2}):(v*100).toFixed(1)+"%";
 const fmtP=p=>p>=1?p.toLocaleString("en-US",{maximumFractionDigits:2}):p.toPrecision(3);
-const fmtV=v=>v>=1e9?(v/1e9).toFixed(1)+" Mr $":(v/1e6).toFixed(0)+" Mn $";
+const fmtV=v=>v>=1e9?(v/1e9).toFixed(1)+" Mr $":v>=1e6?(v/1e6).toFixed(1)+" Mn $":(v/1e3).toFixed(0)+" Bin $";
 const pc=x=>"%"+(x*100).toFixed(1);
 const dt=s=>new Date(s+(s.endsWith("Z")?"":"Z")).toLocaleString("tr-TR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
-let D,favs=[],lim={up:15,dn:15};
+let D,favs=[];
 const PRICE_KEY="coin-radar-personal-prices-v1";
 let personalPrices=[],serverPrices=[],priceBusy=false,priceNotice="";
 try{const saved=JSON.parse(localStorage.getItem(PRICE_KEY)||"[]");if(Array.isArray(saved))personalPrices=saved}catch(e){priceNotice="Tarayıcıdaki kayıtlar okunamadı."}
@@ -118,7 +118,7 @@ function init(){
  for(const k of["up","dn"])$("#s-"+k).textContent=`${D.horizon} saatte ${k==="up"?"+":"-"}%${th} tersine ${k==="up"?"-":"+"}%${th} eşiğinden önce görme olasılığı`;
  $("#app").hidden=false;
  document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{document.querySelectorAll("nav button").forEach(x=>x.setAttribute("aria-selected",x===b));for(const t of["pred","prices","track","model"])$("#v-"+t).hidden=t!==b.dataset.t;if(b.dataset.t==="prices")refreshPrices()});
- ["q","sort","fav"].forEach(i=>$("#"+i).addEventListener("input",()=>{lim={up:15,dn:15};render()}));
+ ["q","sort","fav"].forEach(i=>$("#"+i).addEventListener("input",()=>render()));
  serverPrices=(D.price_history||[]).slice();
  render();priceHistory();track();model();refreshPrices();
 }
@@ -128,16 +128,13 @@ function render(){
   const base=D.metrics[k].base_rate,all=[...D.coins].sort((a,b)=>b["p_"+k]-a["p_"+k]),max=Math.max(all[0]["p_"+k],base)*1.15||1;
   let rows=all.filter(c=>c.symbol.includes(q)&&(!fo||favs.includes(c.symbol)));
   if(key!=="p")rows.sort((a,b)=>(b[key]==null?-Infinity:Math.abs(b[key]))-(a[key]==null?-Infinity:Math.abs(a[key])));
-  const more=rows.length>lim[k]&&!q;
-  $("#l-"+k).innerHTML=rows.slice(0,q?60:lim[k]).map(c=>{const p=c["p_"+k],f=favs.includes(c.symbol);return`<div class="row" data-s="${c.symbol}"><button class="star${f?" on":""}" data-f="${c.symbol}" aria-label="Favori">${f?"★":"☆"}</button><div class="sym">${c.symbol}</div>
+  $("#l-"+k).innerHTML=rows.map(c=>{const p=c["p_"+k],f=favs.includes(c.symbol);return`<div class="row" data-s="${c.symbol}"><button class="star${f?" on":""}" data-f="${c.symbol}" aria-label="Favori">${f?"★":"☆"}</button><div class="sym">${c.symbol}</div>
   <div class="meter" role="img" aria-label="olasılık ${pc(p)}"><div class="fill" style="width:${p/max*100}%"></div><div class="tick" style="left:${base/max*100}%"></div><span class="val">${pc(p)}</span></div>
   <div class="meta">${spark(c.spark,72,22,1.4)}<span>$${fmtP(c.price)}</span><span class="${c.chg24>=0?"pos":"neg"}">24s ${c.chg24>=0?"+":""}${c.chg24.toFixed(1)}%</span><span>${fmtV(c.volume)}</span><span>Genel baz oran ${pc(base)}</span><span>Güven: ${c["confidence_"+k]||"bilinmiyor"}</span><span>Normalden sapma: ${c.vol_zscore==null?"-":c.vol_zscore.toFixed(2)+" z"}</span><span>${c.monitoring?.status==="warning"?"⚠ İzleme/delist uyarısı":c.monitoring?.status==="no_warning_reported"?"Etiket uyarısı bildirilmedi":"İzleme/delist: bilinmiyor"}</span></div></div>`}).join("")||'<p class="sub">Eşleşen coin yok.</p>';
-  if(more)$("#l-"+k).insertAdjacentHTML("beforeend",`<button class="more" data-m="${k}">Daha fazla göster</button>`);
  }
 }
 document.addEventListener("click",e=>{
  const f=e.target.closest("[data-f]");if(f){e.stopPropagation();const s=f.dataset.f;favs=favs.includes(s)?favs.filter(x=>x!==s):[...favs,s];saveFav();render();return}
- const m=e.target.closest("[data-m]");if(m){lim[m.dataset.m]+=15;render();return}
  const r=e.target.closest(".row");if(r)detail(r.dataset.s);
  if(e.target.id==="dlg"||e.target.closest(".x"))$("#dlg").close();
 });
