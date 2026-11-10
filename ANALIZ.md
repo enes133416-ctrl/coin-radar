@@ -49,9 +49,11 @@ Gerçekleşen en yüksek olasılık (SOXSB) **%50,0**. Yani **tüm evrende EV �
 Bu, "model kötü" demek değil; **kurgu matematiksel olarak kaybediyor**. İsabet oranını %13'ten %35'e çıkarsanız bile ±%10/%10 bariyerde para kaybedersiniz. Site şu an "yüzde kaç kazanılıp kaybedileceğini yazıyor" iddiasında ama **maliyet sonrası beklenen değeri hiç hesaplamıyor**; kullanıcı %13 isabeti "%13 kazanç" sanabilir.
 
 **Çözüm üç yol:**
-1. **Asimetrik bariyer**: hedef 3×ATR yukarı, stop 1×ATR aşağı → ödeme oranı 3:1 → başabaş p = **%25**, maliyetle ~%26. Ulaşılabilir bir sayı.
+1. **Asimetrik bariyer**: hedef 3×ATR yukarı, stop 1×ATR aşağı → başabaş p = **%25**. ⚠️ Bu, kâr yaratmaz: sürüklenmesiz fiyatta P(üst bariyere önce değme) = stop/(hedef+stop) = başabaşın ta kendisi. Faydası **ulaşılabilir bir hedef, daha az belirsiz örnek ve dürüst R raporlaması** (bkz. Bölüm 9).
 2. **Daha yüksek baz oranlı hedef**: ±%10/24s baz oranı %4,2 (up) — çok nadir. ±%5/24s baz oranı simülasyonda **%27**; 3×ATR/24s **%35**. Baz oranı yükselince hem örnek sayısı hem öğrenilebilirlik artar.
 3. **Volatiliteye göre ölçeklenmiş bariyer** (`atr_target_enabled` zaten kodda var ama kapalı) → coin başına farklı eşik, aynı "R" biriminde karşılaştırılabilir sonuç.
+
+> **Ölçülmüş uyarı:** Bu üç maddenin hiçbiri tek başına **pozitif beklenti yaratmaz**; sadece ölçümü dürüstleştirir ve hedefi ulaşılabilir kılar. Opsiyonel durdurma teoremi gereği sürüklenmesiz fiyatta hangi bariyer oranı seçilirse seçilsin EV = 0 − maliyet. Gerçek avantaj yalnızca **modelin kalibrasyonu + sürüklenme tahmini** varsa doğar.
 
 > Somut öneri: **hedefi ve stopu ATR cinsinden tanımlayın, sonucu R (risk birimi) olarak raporlayın, maliyeti düşün.** "Silver" gösterge %10 değil, "1,5R'ye ulaşma olasılığı" olmalı.
 
@@ -501,3 +503,74 @@ def test_tie_break_is_deterministic():            # 8.4
 def test_price_history_tracks_target_before_stop():  # 8.5
     ...
 ```
+
+---
+
+## 9. Düzeltme ve net cevap: "Bunlar tahmin tutma ihtimalini artırır mı?"
+
+Bu soru iki farklı şeyi karıştırıyor; ayrıştırmak gerekiyor:
+
+- **(A) Bir coinin hedefe ulaşma sıklığı** (isabet oranı) — bariyer ve piyasa belirler.
+- **(B) Modelin söylediği olasılığın doğru çıkması** (kalibrasyon) — veri ve yöntem belirler.
+
+### 9.1 Ayrı simülasyonla ölçülen etkiler
+
+Sürüklenmesiz GBM, 3.000–6.000 yol, evrenin gerçek `vol24` değerleri:
+
+| Ayar | Evren medyanı isabet | En iyi 10 coin | Başabaş gereken |
+|---|---|---|---|
+| ±%10 (mevcut) | %4,0 | **%32,9** | %50,0 |
+| +%7,5 / −%2,5 | %10,5 | %29,8 | %25,0 |
+| +%2,5 / −%7,5 | %53,2 | %68,3 | %75,0 |
+
+**"Mükemmel model" üst sınırı:** sadece coin seçimi kusursuz olsa (gelecekteki volatiliteyi tam bilse), ±%10/24s hedefinde en iyi 10 coinin isabeti **≈%33**, en iyi 3 coinin **≈%46,5**. Model şu an **%13,5**.
+
+### 9.2 İsabet oranını yükseltme tuzağı
+
+Tipik bir coin için (saatlik σ = %1,0) bariyeri değiştirmenin isabet ve beklentiye etkisi:
+
+| Hedef | Stop | "İsabet" | Başabaş | İşlem başına EV |
+|---|---|---|---|---|
+| +%0,5 | −%10 | %82,8 | %95,2 | **−1,3%** |
+| +%1,0 | −%10 | %74,1 | %90,9 | **−1,9%** |
+| +%2,0 | −%10 | %60,1 | %83,3 | **−2,8%** |
+| +%5,0 | −%5 | %26,8 | %50,0 | −2,3% |
+| +%7,5 | −%2,5 | %10,7 | %25,0 | −1,4% |
+| +%10 | −%10 | %4,2 | %50,0 | −9,2% |
+
+Matematik: sürüklenmesiz fiyatta **P(üst bariyere önce değme) = stop / (hedef + stop)** — yani başabaş oranının ta kendisi. Hangi bariyer oranını seçerseniz seçin, maliyet öncesi beklenen değer **tam olarak sıfırdır**. Bariyer oranı kâr yaratmaz; yalnızca gerçekleşme sıklığını, ölçülebilirliği ve kullanıcının yanılma biçimini değiştirir.
+
+> **Kendi raporumdaki düzeltme:** Bölüm 4.1'deki "3:1 asimetrik → 9 adayda pozitif EV" ifadesi, modelin **şişkin** olasılıklarıyla yapılmış bir hesaptı ve yanıltıcı. Gerçekçi (kalibre edilmiş) olasılıklarla, hangi bariyer seçilirse seçilsin EV ≈ 0 − maliyet olur. Asimetrik bariyerin gerçek faydası **kâr değil**, şu üçüdür:
+> 1. Hedef **ulaşılabilir** olur (24s'de 3×ATR, 10%'dan çok daha sık) → örnek sayısı ve dolayısıyla öğrenilebilirlik artar.
+> 2. Aynı saatlik mumda iki bariyerin çakışma (belirsiz örnek) oranı düşer → değerlendirme daha az yanlı olur.
+> 3. "İsabet %50" gibi yanıltıcı bir sayı yerine "1R başına beklenti" gibi dürüst bir sayı üretir.
+
+### 9.3 Tavsiyelerin sınıflandırması
+
+**A. Tahmin kalitesini (B) gerçekten artırır — evet, ölçülebilir:**
+
+| Tavsiye | Etki | Neden eminim |
+|---|---|---|
+| Aynı saatte çift kayıt engeli + sessiz budamanın kaldırılması | Canlı isabet oranı **doğru** ölçülür (bugün yukarı yanlı) | 01:00 için 32 kayıt var, olması gereken 20 |
+| Fold karıştırma hatasının düzeltilmesi | Düşüş modeli AUC'si 0,560 → ~0,72 | Fold AUC'leri 0,700/0,751/0,698 |
+| Kalibrasyon üst kovasının düzeltilmesi | %50 diyen yer %12 der → karar doğru olur | Kalibrasyon tablosu, n=443 |
+| Eşitlik (tie) kırma | Top-10 seçimi rastgelelikten kurtulur | 10. sırada 10 coin eşit |
+| Örnekleme fazı (`thin`) | İç-gün + funding özellikleri geri gelir | `utc_hour`/`hours_to_funding` "sabit" diye düştü |
+| Taban çizgisi (vol-only) | Modelin gerçekten bir şey eklediği görülür | vol-only ile Spearman 0,851 |
+| Futures verisinin geri getirilmesi | Modelin en güçlü özellik ailesi açılır | 125/125 coinde 451 hatası |
+| Tokenize hisselerin ayrılması | Farklı dağılım/gap karışması biter | 49/125 coin, |24s| medyanı 4 kat |
+| Ranking hedefi | Top-10 optimizasyonu doğru yapılır | Metrik zaten top-k |
+| Stabilcoin otomatik filtresi | Evren temizlenir | BFUSD ATR %0,009 |
+
+**B. İsabet oranını artırır ama para kazandırmaz — dikkat:**
+- Bariyeri daraltmak (ör. +%2/−%10 → isabet %60). Yukarıdaki tablo: EV hâlâ negatif. **Bu bir iyileşme değil, yanıltıcı bir kozmetik.**
+
+**C. Tahmin kalitesini artırmaz, ama siteyi güvenilir yapar (yine de gerekli):**
+- Blok güven aralıkları, BSS, kâğıt portföy, veri sağlığı bandı, model versiyonlama, şema sürümü, `veri_yok`/`evrenden_cikti` durumları, arayüzün tek tabloya indirilmesi, mobil kartlar, alarm.
+
+**D. Gereksiz kalabalık — kaldırılmalı:**
+- "Güven: yüksek/orta" (125/125 aynı), "İzleme/delist: bilinmiyor" (125/125 aynı), her coinde tekrarlanan `futures_errors` (125×5 satır), `vol_zscore` satırı (sıralamayla 0,165 korelasyon), çift sütunlu yön yerleşimi, detay penceresindeki 41 satırlık gösterge tablosu, olasılığın %2 hassasiyetle gösterilmesi (gerçek çözünürlük 13 basamak).
+
+### 9.4 Tek cümlelik cevap
+
+> Hayır — **hiçbir tavsiye isabet oranını %13'ten %51'e çıkarmaz**; o hedefin ulaşılabilir tavanı kusursuz bir modelde bile ≈%33'tür. Tavsiyelerin **büyük kısmı tahmin kalitesini artırmaz; yalan söylemeyi bırakmasını sağlar** (kalibrasyon, tie, çift kayıt, taban çizgisi). Tahmin kalitesini gerçekten artıran kısım az ve nettir: **kalibrasyon düzeltmesi, örnekleme fazı, futures verisi, hisse/kripto ayrımı, ranking hedefi, tie kırma.** Kalabalık olan kısım ise arayüz ve ölçüm katmanıdır — ama tam da bugün modelin **kendini kanıtlayamamasının** sebebi o katman.
