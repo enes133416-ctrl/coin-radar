@@ -15,8 +15,8 @@ h1{font-size:clamp(34px,6vw,60px);line-height:1;margin:0 0 10px;font-weight:800;
 .lead{max-width:66ch;color:var(--mute);margin:0 0 22px}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:22px}
 .stats div{background:var(--card);padding:12px 16px}.stats b{display:block;font-size:20px}.stats span{font-size:13px;color:var(--mute)}
-nav{display:flex;gap:6px;border-bottom:1px solid var(--line);margin-bottom:18px}
-nav button{background:none;border:0;border-bottom:3px solid transparent;padding:10px 14px;font:inherit;font-weight:700;color:var(--mute);cursor:pointer}
+nav{display:flex;gap:6px;overflow-x:auto;border-bottom:1px solid var(--line);margin-bottom:18px}
+nav button{white-space:nowrap;background:none;border:0;border-bottom:3px solid transparent;padding:10px 14px;font:inherit;font-weight:700;color:var(--mute);cursor:pointer}
 nav button[aria-selected=true]{color:var(--ink);border-color:var(--ink)}
 .tools{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:18px}
 input,select{padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font:inherit}
@@ -72,7 +72,7 @@ h3{margin:18px 0 6px;font-size:16px}.note{font-size:13px;color:var(--mute)}
 <div id="msg" hidden>Veri bulunamadı. Actions sekmesinden <b>update-data</b> iş akışını çalıştır.</div>
 <div id="app" hidden>
 <div class="stats" id="stats"></div>
-<nav role="tablist"><button role="tab" data-t="pred" aria-selected="true">Tahminler</button><button role="tab" data-t="track" aria-selected="false">Takip</button><button role="tab" data-t="model" aria-selected="false">Model</button></nav>
+<nav role="tablist"><button role="tab" data-t="pred" aria-selected="true">Tahminler</button><button role="tab" data-t="prices" aria-selected="false">Fiyat kayıtları</button><button role="tab" data-t="track" aria-selected="false">Takip</button><button role="tab" data-t="model" aria-selected="false">Model</button></nav>
 <section id="v-pred">
 <div class="tools"><input id="q" type="search" placeholder="Coin ara, örn. SOL" aria-label="Coin ara">
 <select id="sort" aria-label="Sırala"><option value="p">Olasılığa göre</option><option value="vol_zscore">Normalden sapmaya göre</option><option value="volume">Hacme göre</option><option value="chg24">24s değişime göre</option></select>
@@ -80,12 +80,14 @@ h3{margin:18px 0 6px;font-size:16px}.note{font-size:13px;color:var(--mute)}
 <div class="cols"><section class="col up"><h2>Yükseliş adayları</h2><p class="sub" id="s-up"></p><div id="l-up"></div></section>
 <section class="col dn"><h2>Düşüş adayları</h2><p class="sub" id="s-dn"></p><div id="l-dn"></div></section></div>
 </section>
+<section id="v-prices" hidden></section>
 <section id="v-track" hidden></section>
 <section id="v-model" hidden></section>
 </div>
 <p class="note" style="margin-top:26px;max-width:75ch">Yatırım tavsiyesi değildir. Olasılıklar geçmiş veriye dayanır; %10 hareket nadir bir olaydır ve yüksek skor bile çoğu zaman gerçekleşmeme demektir. Dikey çizgi, test döneminde olayın ortalama gerçekleşme oranıdır.</p>
 </main>
 <dialog id="dlg"></dialog>
+<script src="price-history.js"></script>
 <script>
 const $=s=>document.querySelector(s);
 const TR={ret1:"1s getiri",ret3:"3s getiri",ret6:"6s getiri",ret12:"12s getiri",ret24:"24s getiri",ret48:"48s getiri",ret120:"5 gün getiri",vol24:"24s oynaklık",vol72:"72s oynaklık",vol_ratio:"Oynaklık oranı (24s/72s)",range24:"24s fiyat aralığı",atr14:"Ort. mum boyu (14s)",to_hi24:"24s zirvesine uzaklık",to_lo24:"24s dibine uzaklık",to_hi120:"5g zirvesine uzaklık",to_lo120:"5g dibine uzaklık",volx:"Hacim / 24s ortalama",volx3:"3s hacim / 72s ort.",rsi:"RSI (14)",ema_gap:"EMA12 / EMA48 farkı"};
@@ -97,6 +99,10 @@ const fmtV=v=>v>=1e9?(v/1e9).toFixed(1)+" Mr $":(v/1e6).toFixed(0)+" Mn $";
 const pc=x=>"%"+(x*100).toFixed(1);
 const dt=s=>new Date(s+(s.endsWith("Z")?"":"Z")).toLocaleString("tr-TR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
 let D,favs=[],lim={up:15,dn:15};
+const PRICE_KEY="coin-radar-personal-prices-v1";
+let personalPrices=[],serverPrices=[],priceBusy=false,priceNotice="";
+try{const saved=JSON.parse(localStorage.getItem(PRICE_KEY)||"[]");if(Array.isArray(saved))personalPrices=saved}catch(e){priceNotice="Tarayıcıdaki kayıtlar okunamadı."}
+function savePersonalPrices(){try{localStorage.setItem(PRICE_KEY,JSON.stringify(personalPrices));return true}catch(e){priceNotice="Tarayıcı kayıt alanı kullanılamıyor; kayıtlar kalıcı olmayabilir.";return false}}
 try{favs=JSON.parse(localStorage.getItem("fav")||"[]")}catch(e){}
 const saveFav=()=>{try{localStorage.setItem("fav",JSON.stringify(favs))}catch(e){}};
 function spark(a,w=84,h=26,sw=1.6){const mn=Math.min(...a),r=Math.max(...a)-mn||1,p=a.map((v,i)=>`${(i/(a.length-1)*w).toFixed(1)},${(h-(v-mn)/r*(h-3)-1.5).toFixed(1)}`).join(" ");
@@ -111,9 +117,10 @@ function init(){
  $("#stats").innerHTML=[[new Date(D.generated).toLocaleString("tr-TR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}),"Son güncelleme"],[m.candles.toLocaleString("tr-TR"),`mum (${m.data_from.slice(5,10)} - ${m.data_to.slice(5,10)})`],[m.train_rows.toLocaleString("tr-TR"),`eğitim örneği, ${m.features} özellik`],[all?pc(hh/all):"Bekliyor",all?`canlı isabet (${all} tahmin)`:"canlı takip sonucu"]].map(x=>`<div><b>${x[0]}</b><span>${x[1]}</span></div>`).join("");
  for(const k of["up","dn"])$("#s-"+k).textContent=`${D.horizon} saatte ${k==="up"?"+":"-"}%${th} tersine ${k==="up"?"-":"+"}%${th} eşiğinden önce görme olasılığı`;
  $("#app").hidden=false;
- document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{document.querySelectorAll("nav button").forEach(x=>x.setAttribute("aria-selected",x===b));for(const t of["pred","track","model"])$("#v-"+t).hidden=t!==b.dataset.t});
+ document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{document.querySelectorAll("nav button").forEach(x=>x.setAttribute("aria-selected",x===b));for(const t of["pred","prices","track","model"])$("#v-"+t).hidden=t!==b.dataset.t;if(b.dataset.t==="prices")refreshPrices()});
  ["q","sort","fav"].forEach(i=>$("#"+i).addEventListener("input",()=>{lim={up:15,dn:15};render()}));
- render();track();model();
+ serverPrices=(D.price_history||[]).slice();
+ render();priceHistory();track();model();refreshPrices();
 }
 function render(){
  const q=$("#q").value.trim().toUpperCase(),key=$("#sort").value,fo=$("#fav").checked;
@@ -148,10 +155,55 @@ function detail(s){
  <h3>Bu coinin geçmiş tahminleri</h3>${h.length?`<div class="tw"><table><tr><th>Zaman</th><th>Yön</th><th>Skor</th><th>Maks ↑</th><th>Maks ↓</th><th>Sonuç</th></tr>${h.map(e=>`<tr><td>${dt(e.t)}</td><td>${e.side==="up"?"Yükseliş":"Düşüş"}</td><td>${pc(e.p)}</td><td>${pc(e.max_up)}</td><td>${pc(e.max_dn)}</td><td>${badge(e)}</td></tr>`).join("")}</table></div>`:'<p class="note">Henüz sonuçlanmış tahmin yok.</p>'}`;
  $("#dlg").showModal();
 }
+function priceHistory(){
+ const rows=[...serverPrices.map(e=>({...e,source:"Otomatik"})),...personalPrices.map(e=>({...e,source:"Bu tarayıcı"}))].sort((a,b)=>Date.parse(b.recorded_at)-Date.parse(a.recorded_at));
+ const money=n=>n==null?"-":"$"+Number(n).toLocaleString("en-US",{maximumSignificantDigits:10});
+ const time=s=>new Date(s).toLocaleString("tr-TR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
+ const change=(value,price)=>{if(value==null||price==null)return "-";const p=(value/price-1)*100;return `<span class="${p>=0?"pos":"neg"}">${p>=0?"+":""}${p.toFixed(2)}%</span>`};
+ $("#v-prices").innerHTML=`<div class="box"><h2>Yükseliş adayları · fiyat kayıtları</h2>
+ <p class="sub">Her başarılı taramada modelin en yüksek yükseliş olasılığı verdiği coinlerin o andaki Binance USDT fiyatı kaydedilir. Her kayıt, kayıttan sonraki ilk 24 saat içinde görülen en yüksek ve en düşük fiyatla karşılaştırılır; 24 saat dolunca sonuç sabitlenir.</p>
+ <p><button class="more" id="save-prices" ${priceBusy?"disabled":""}>${priceBusy?"Fiyatlar alınıyor...":"Yükseliş adaylarını şimdi kaydet"}</button> <button class="more" id="refresh-prices" ${priceBusy?"disabled":""}>Sonuçları yenile</button></p>
+ <p class="note">Şimdi kaydet düğmesi en yüksek olasılıklı 10 adayı bu tarayıcıya kaydeder; bu kayıtlar başka cihazlara aktarılmaz. Sayfayı tekrar açtığınızda sonuçlar Binance üzerinden yenilenir. Otomatik kayıtlar ayrıca sunucunun başarılı taramalarında oluşur. ${priceNotice}</p>
+ <p class="note">Fiyatlar bir dakikalık mumlardan alınır. Kayıttan önceki hareketler karışmasın diye kaydın yapıldığı kısmi dakika dışarıda bırakılır. Devam eden kayıtlar yalnızca son taramaya kadar tamamlanmış dakikaları kapsar. Yüzdeler komisyon ve kayma hariç teorik fiyat değişimidir; gerçekleşmiş işlem veya garanti değildir.</p>
+ ${rows.length?`<div class="tw"><table><thead><tr><th>Kayıt zamanı</th><th>Kaynak</th><th>Coin</th><th>Olasılık</th><th>Kayıt fiyatı</th><th>En yüksek</th><th>Yüksekte değişim</th><th>En düşük</th><th>Düşükte değişim</th><th>Durum / veri zamanı</th></tr></thead><tbody>${rows.map(e=>`<tr><td>${time(e.recorded_at)}</td><td>${e.source}</td><td><b>${e.symbol}</b></td><td>${e.probability==null?"-":pc(e.probability)}</td><td>${money(e.price)}</td><td>${money(e.high)}</td><td>${change(e.high,e.price)}</td><td>${money(e.low)}</td><td>${change(e.low,e.price)}</td><td>${e.error?`${e.error}${e.observed_until?` (Son doğrulanan: ${time(e.observed_until)})`:""}`:e.status==="complete"?"24 saat tamamlandı":e.observed_until?`Devam ediyor · ${time(e.observed_until)} kadar`:"İlk tam dakika bekleniyor"}</td></tr>`).join("")}</tbody></table></div>`:'<p class="sub">Henüz fiyat kaydı yok. Bir sonraki başarılı taramada kayıtlar otomatik oluşacak.</p>'}</div>`;
+}
+async function pricePool(items,work){
+ let next=0;
+ await Promise.all(Array.from({length:Math.min(4,items.length)},async()=>{while(next<items.length){const item=items[next++];await work(item)}}));
+}
+async function refreshPrices(){
+ if(priceBusy)return;
+ const serverIndexes=serverPrices.map((e,i)=>e.status==="pending"?i:-1).filter(i=>i>=0);
+ const personalIndexes=personalPrices.map((e,i)=>e.status==="pending"?i:-1).filter(i=>i>=0);
+ if(!serverIndexes.length&&!personalIndexes.length)return;
+ priceBusy=true;priceNotice="Sonuçlar Binance üzerinden güncelleniyor...";priceHistory();
+ let errors=0;
+ const jobs=[...serverIndexes.map(i=>[serverPrices,i]),...personalIndexes.map(i=>[personalPrices,i])];
+ await pricePool(jobs,async ([list,i])=>{try{list[i]=await PriceHistory.refresh(list[i])}catch(e){errors++;list[i]={...list[i],error:"Binance verisine ulaşılamadı; yeniden deneyin."}}});
+ priceBusy=false;priceNotice=errors?`${errors} kayıt güncellenemedi. Binance erişimini kontrol edin ve yeniden deneyin.`:"Sonuçlar güncellendi.";
+ if(personalIndexes.length)savePersonalPrices();priceHistory();
+}
+async function savePriceCandidates(){
+ if(priceBusy)return;
+ priceBusy=true;priceNotice="Güncel fiyatlar alınıyor...";priceHistory();
+ let failures=0,added=0;
+ await pricePool([...D.coins].sort((a,b)=>b.p_up-a.p_up).slice(0,10),async c=>{
+  try{const price=await PriceHistory.quote(c.symbol);personalPrices.push({symbol:c.symbol,price,probability:c.p_up,recorded_at:new Date().toISOString(),status:"pending",high:null,low:null,error:null});added++}
+  catch(e){failures++}
+ });
+ personalPrices=personalPrices.slice(-400);priceBusy=false;
+ priceNotice=`${added} coin kaydedildi.${failures?` ${failures} coinin fiyatı alınamadı; Binance erişimini kontrol edin.`:""} İlk tam dakika kapandıktan sonra sonuçlar gösterilir.`;
+ if(added)savePersonalPrices();priceHistory();
+}
+document.addEventListener("click",e=>{
+ if(e.target.id==="save-prices")savePriceCandidates();
+ if(e.target.id==="refresh-prices")refreshPrices();
+});
+setInterval(()=>{if(D&&!document.hidden&&!$("#v-prices").hidden)refreshPrices()},60000);
 function track(){
  const th=Math.round(D.threshold*100),box=k=>{const r=hitRate(k),b=D.metrics[k].base_rate;return`<div class="box ${k}"><h2>${k==="up"?"Yükseliş":"Düşüş"} tahminleri</h2><div class="big ${k==="up"?"pos":"neg"}">${r.n?pc(r.h/r.n):"-"}</div><div class="note">${r.n?`${r.n} sonuçlanan tahminden ${r.h} tanesi tuttu`:"Henüz sonuçlanan yok"}. Rastgele seçimde beklenen: ${pc(b)}</div></div>`};
  const rows=D.track.slice(0,60);
- $("#v-track").innerHTML=`<div class="g2">${box("up")}${box("dn")}</div><div class="box"><h2>Kayıt defteri</h2><p class="sub">Her güncellemede her yönden en yüksek 10 coin kaydedilir; ${D.horizon} saat sonra "tuttu" demek, fiyatın ${th}% hareketi tersine ${th}% gitmeden yaptığı anlamına gelir. Takip, tahmin yayınlandıktan sonraki ilk tam mumun açılış fiyatından başlar; bu fiyat modelin son kapanış fiyatından farklı olabilir.</p>
+ $("#v-track").innerHTML=`<div class="g2">${box("up")}${box("dn")}</div><div class="box"><h2>Kayıt defteri</h2><p class="sub">Her güncellemede her yönden en yüksek 10 coin kaydedilir; sonuçlar ${D.horizon} saat dolduktan sonraki başarılı taramada güncellenir. Daha erken fiyat hareketleri için Fiyat kayıtları sekmesini kullanın. ${D.horizon} saat sonra "tuttu" demek, fiyatın ${th}% hareketi tersine ${th}% gitmeden yaptığı anlamına gelir. Takip, tahmin yayınlandıktan sonraki ilk tam mumun açılış fiyatından başlar; bu fiyat modelin son kapanış fiyatından farklı olabilir.</p>
  ${rows.length||D.pending.length?`<div class="tw"><table><tr><th>Zaman</th><th>Coin</th><th>Yön</th><th>Skor</th><th>Fiyat</th><th>Maks ↑</th><th>Maks ↓</th><th>Sonuç</th></tr>${[...D.pending.slice().reverse().map(e=>({...e,max_up:null})),...rows].map(e=>`<tr><td>${dt(e.t)}</td><td><b>${e.sym}</b></td><td>${e.side==="up"?"Yükseliş":"Düşüş"}</td><td>${pc(e.p)}</td><td>${e.price==null?"sonraki açılış":`$${fmtP(e.price)}`}</td><td>${e.max_up==null?"-":pc(e.max_up)}</td><td>${e.max_dn==null?"-":pc(e.max_dn)}</td><td>${badge(e)}</td></tr>`).join("")}</table></div>`:'<p class="note">Henüz kayıt yok.</p>'}</div>`;
 }
 function model(){
